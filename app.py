@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.8.7", layout="wide")
+st.set_page_config(page_title="CHERRY v13.8.8", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
@@ -77,7 +77,7 @@ def manual_item_popup():
     if st.button("ΠΡΟΣΘΗΚΗ", use_container_width=True):
         if m_name:
             st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
-            st.rerun()
+            st.rerun() # Αυτό θα αναγκάσει το Dialog να κλείσει
 
 @st.dialog("👤 ΝΕΟΣ ΠΕΛΑΤΗΣ")
 def new_customer_popup(phone):
@@ -97,6 +97,7 @@ def payment_popup():
     disc = 0.0
     
     if opt == "ΝΑΙ":
+        # Επανήλθε το λεκτικό "Ποσό ή ποσοστό"
         inp = st.text_input("Ποσό ή % (π.χ. 10%):", key="discount_input")
         if inp:
             try:
@@ -117,20 +118,36 @@ def finalize(disc_val, method):
     trans_id = datetime.now().strftime("%y%m%d%H%M%S")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # ΔΙΟΡΘΩΣΗ: Αν είναι Λιανική (id=0), στέλνουμε None στη βάση
+    c_id = st.session_state.selected_cust_id
+    if c_id == 0: c_id = None
+
     for i in st.session_state.cart:
         d = round(i['price'] * ratio, 2)
         f = round(i['price'] - d, 2)
-        c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
         
-        data = {"barcode": i['bc'], "item_name": i['name'], "unit_price": i['price'], "discount": d, "final_item_price": f, "method": method, "s_date": ts, "cust_id": c_id, "transaction_id": trans_id}
+        data = {
+            "barcode": i['bc'], 
+            "item_name": i['name'], 
+            "unit_price": i['price'], 
+            "discount": d, 
+            "final_item_price": f, 
+            "method": method, 
+            "s_date": ts, 
+            "cust_id": c_id, 
+            "transaction_id": trans_id
+        }
+        # Αποθήκευση
         supabase.table("sales").insert(data).execute()
         
+        # Ενημέρωση αποθέματος (εκτός από το 999)
         if i['bc'] != '999':
             res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).single().execute()
             if res.data:
                 supabase.table("inventory").update({"stock": res.data['stock'] - 1}).eq("barcode", i['bc']).execute()
+    
     st.success("Η συναλλαγή ολοκληρώθηκε!")
-    time.sleep(0.4)
+    time.sleep(0.5)
     reset_app()
 
 def display_report(df):
@@ -152,13 +169,13 @@ def display_report(df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.8.7")
+    st.title("CHERRY 13.8.8")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     st.write("---")
-    if st.button("❌ ΕΞΟΔΟΣ", key="btn_exit_pos", use_container_width=True):
+    if st.button("❌ ΕΞΟΔΟΣ", key="btn_exit_final", use_container_width=True):
         st.session_state.is_logged_out = True
         st.rerun()
 
