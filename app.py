@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.1", layout="wide")
+st.set_page_config(page_title="CHERRY v13.2", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
@@ -88,7 +88,6 @@ def finalize(disc_val, method):
     for i in st.session_state.cart:
         d = round(i['price'] * ratio, 1)
         f = round(i['price'] - d, 1)
-        # Χρησιμοποιούμε None αντί για 0 για την Λιανική για να αποφύγουμε λάθη σύνδεσης
         c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
         supabase.table("sales").insert({
             "barcode": i['bc'], "item_name": i['name'], "unit_price": i['price'],
@@ -104,9 +103,31 @@ def finalize(disc_val, method):
     st.session_state.cart, st.session_state.selected_cust_id, st.session_state.cust_name = [], None, "Λιανική Πώληση"
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.rerun()
 
+def display_report(df):
+    if df.empty:
+        st.info("Δεν βρέθηκαν δεδομένα για αυτή την περίοδο.")
+        return
+    
+    # Προσθήκη στήλης ΠΡΑΞΗ (αντίστροφη αρίθμηση)
+    df = df.sort_values('s_date', ascending=False).reset_index(drop=True)
+    df['ΠΡΑΞΗ'] = range(len(df), 0, -1)
+    
+    # Υπολογισμοί
+    m_df = df[df['method'] == 'Μετρητά']
+    k_df = df[df['method'] == 'Κάρτα']
+    
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ</p><p class='stat-val'>{m_df['final_item_price'].sum():.1f}€</p></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ</p><p class='stat-val'>{k_df['final_item_price'].sum():.1f}€</p></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ</p><p class='stat-val'>{df['final_item_price'].sum():.1f}€</p></div>", unsafe_allow_html=True)
+    c4.markdown(f"<div class='report-stat'><p class='stat-label'>🔢 ΠΡΑΞΕΙΣ ΜΕΤΡ.</p><p class='stat-val'>{len(m_df)}</p></div>", unsafe_allow_html=True)
+    c5.markdown(f"<div class='report-stat'><p class='stat-label'>🔢 ΠΡΑΞΕΙΣ ΚΑΡΤ.</p><p class='stat-val'>{len(k_df)}</p></div>", unsafe_allow_html=True)
+    
+    st.dataframe(df[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method']], use_container_width=True, hide_index=True)
+
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.1")
+    st.title("CHERRY 13.2")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
@@ -151,26 +172,27 @@ if view == "🛒 ΤΑΜΕΙΟ":
         st.markdown(f"<div class='total-label'>{total:.1f}€</div>", unsafe_allow_html=True)
 
 elif view == "📊 MANAGER":
-    st.header("📊 Πωλήσεις")
-    # Απλοποιημένο query για αποφυγή σφαλμάτων API
+    st.header("📊 Αναφορές Πωλήσεων")
+    t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
+    
+    # Φόρτωση όλων των πωλήσεων
     res = supabase.table("sales").select("*").execute()
     if res.data:
-        df = pd.DataFrame(res.data)
-        df['s_date_dt'] = pd.to_datetime(df['s_date'])
+        all_df = pd.DataFrame(res.data)
+        all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
         
-        # Φίλτρο Σημερινών
-        today_df = df[df['s_date_dt'].dt.date == date.today()]
-        m_sum = today_df[today_df['method'] == 'Μετρητά']['final_item_price'].sum()
-        k_sum = today_df[today_df['method'] == 'Κάρτα']['final_item_price'].sum()
-        
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ (ΣΗΜΕΡΑ)</p><p class='stat-val'>{m_sum:.1f}€</p></div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ (ΣΗΜΕΡΑ)</p><p class='stat-val'>{k_sum:.1f}€</p></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ (ΣΗΜΕΡΑ)</p><p class='stat-val'>{m_sum+k_sum:.1f}€</p></div>", unsafe_allow_html=True)
-        
-        st.dataframe(df[['s_date', 'item_name', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+        with t1:
+            today_df = all_df[all_df['s_date_dt'].dt.date == date.today()]
+            display_report(today_df)
+            
+        with t2:
+            c1, c2 = st.columns(2)
+            d_start = c1.date_input("Από:", date.today() - timedelta(days=7))
+            d_end = c2.date_input("Έως:", date.today())
+            period_df = all_df[(all_df['s_date_dt'].dt.date >= d_start) & (all_df['s_date_dt'].dt.date <= d_end)]
+            display_report(period_df)
     else:
-        st.info("Δεν βρέθηκαν πωλήσεις.")
+        st.info("Δεν υπάρχουν πωλήσεις στη βάση.")
 
 elif view == "📦 ΑΠΟΘΗΚΗ":
     st.header("📦 Αποθέματα")
