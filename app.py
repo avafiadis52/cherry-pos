@@ -109,7 +109,7 @@ def new_customer_popup(phone):
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
     st.markdown(f"<h3 style='text-align:center; color: #888;'>Σύνολο: {total:.1f}€</h3>", unsafe_allow_html=True)
-    opt = st.radio("Έκπτωση;", ["ΕΠΙΛΟΞΤΕ", "ΟΧΙ", "ΝΑΙ"], horizontal=True)
+    opt = st.radio("Έκπτωση;", ["ΕΠΙΛEΞΤΕ", "ΟΧΙ", "ΝΑΙ"], horizontal=True)
     disc = 0.0
     show_final = False
     if opt == "ΝΑΙ":
