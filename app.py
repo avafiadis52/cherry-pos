@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.7", layout="wide")
+st.set_page_config(page_title="CHERRY v13.8", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
@@ -26,6 +26,21 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; min-height: 80px; }
     .stat-val { font-size: 22px; font-weight: bold; color: #2ecc71; margin: 0; }
     .stat-label { font-size: 12px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
+    
+    /* Στυλ για το κουμπί Backup με μαύρα γράμματα */
+    div.stDownloadButton > button {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+        font-weight: bold !important;
+        border: 2px solid #2ecc71 !important;
+    }
+    
+    /* Στυλ για το κουμπί Έξοδος */
+    .exit-btn {
+        background-color: #e74c3c !important;
+        color: white !important;
+    }
+
     @media (max-width: 640px) {
         .total-label { font-size: 45px; }
         .stButton>button { height: 3.5em; font-size: 16px !important; }
@@ -45,6 +60,14 @@ if 'audio_enabled' not in st.session_state: st.session_state.audio_enabled = Fal
 def trigger_alert_sound():
     sound_url = "https://www.soundjay.com/buttons/beep-01a.mp3"
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
+
+def reset_app():
+    st.session_state.cart = []
+    st.session_state.selected_cust_id = None
+    st.session_state.cust_name = "Λιανική Πώληση"
+    st.session_state.bc_key += 1
+    st.session_state.ph_key += 1
+    st.rerun()
 
 @st.dialog("👤 ΝΕΟΣ ΠΕΛΑΤΗΣ")
 def new_customer_popup(phone):
@@ -110,8 +133,7 @@ def finalize(disc_val, method):
             
     st.success("✅ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
     time.sleep(0.8)
-    st.session_state.cart, st.session_state.selected_cust_id, st.session_state.cust_name = [], None, "Λιανική Πώληση"
-    st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.rerun()
+    reset_app()
 
 def display_report(df):
     if df.empty:
@@ -148,11 +170,16 @@ def display_report(df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.7")
+    st.title("CHERRY 13.8")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
+    
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
+    
+    st.write("---")
+    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
+        reset_app()
 
 if view == "🛒 ΤΑΜΕΙΟ":
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
@@ -184,8 +211,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
             if st.session_state.cart:
                 if st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
         if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True):
-            st.session_state.cart, st.session_state.selected_cust_id, st.session_state.cust_name = [], None, "Λιανική Πώληση"
-            st.session_state.bc_key += 1; st.rerun()
+            reset_app()
     with cr:
         total = sum(i['price'] for i in st.session_state.cart)
         lines = [f"{i['name'][:20]:<20} | {i['price']:>6.1f}€" for i in st.session_state.cart]
@@ -195,11 +221,11 @@ if view == "🛒 ΤΑΜΕΙΟ":
 elif view == "📊 MANAGER":
     st.header("📊 Αναφορές Πωλήσεων")
     
-    # Φόρτωση όλων των δεδομένων για backup
     res_all = supabase.table("sales").select("*").execute()
     if res_all.data:
         full_df = pd.DataFrame(res_all.data)
         csv = full_df.to_csv(index=False).encode('utf-8-sig')
+        # Το κουμπί πλέον έχει μαύρα γράμματα μέσω CSS
         st.download_button("📥 DOWNLOAD BACKUP (CSV)", csv, "cherry_sales_backup.csv", "text/csv", use_container_width=True)
     
     t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
