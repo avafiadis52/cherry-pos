@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.9.7", layout="wide")
+st.set_page_config(page_title="CHERRY v13.9.8", layout="wide")
 st.markdown("""
     <style>
     /* Γενικό στυλ */
@@ -113,7 +113,7 @@ def payment_popup():
             try:
                 if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
                 else: disc = round(float(inp), 2)
-            except: st.error("Σφάλμα")
+            except: st.error("Σφάλμα τιμής")
     final_p = round(total - disc, 2)
     st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
@@ -165,7 +165,7 @@ def display_report(sales_df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.9.7")
+    st.title("CHERRY 13.9.8")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
         st.session_state.is_logged_out = True; st.rerun()
