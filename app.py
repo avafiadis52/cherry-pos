@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.5", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.6", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -37,8 +37,6 @@ st.markdown("""
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
-    
-    /* Στυλ για την ημερομηνία στο Sidebar */
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; text-align: left; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
@@ -59,6 +57,10 @@ if st.session_state.is_logged_out:
     st.stop()
 
 # --- 3. FUNCTIONS ---
+def get_athens_now():
+    # Διόρθωση ώρας για Ελλάδα (UTC + 2)
+    return datetime.now() + timedelta(hours=2)
+
 def trigger_alert_sound():
     sound_url = "https://www.soundjay.com/buttons/beep-01a.mp3"
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
@@ -112,7 +114,7 @@ def payment_popup():
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
@@ -149,11 +151,10 @@ def display_report(sales_df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    # Εμφάνιση Ημερομηνίας και Ώρας πάνω αριστερά (στο sidebar)
-    now = datetime.now()
+    now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
     
-    st.title("CHERRY 14.0.5")
+    st.title("CHERRY 14.0.6")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
@@ -207,12 +208,11 @@ elif view == "📊 MANAGER":
         
         t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ"])
         with t1:
-            # Δυναμικός υπολογισμός ημερομηνίας τώρα
-            today_date = datetime.now().date()
+            today_date = get_athens_now().date()
             display_report(full_df[full_df['s_date_dt'].dt.date == today_date])
         with t2:
             c1, c2 = st.columns(2)
-            d_s, d_e = c1.date_input("Από:", date.today() - timedelta(days=7)), c2.date_input("Έως:", date.today())
+            d_s, d_e = c1.date_input("Από:", get_athens_now().date() - timedelta(days=7)), c2.date_input("Έως:", get_athens_now().date())
             display_report(full_df[(full_df['s_date_dt'].dt.date >= d_s) & (full_df['s_date_dt'].dt.date <= d_e)])
     else: st.info("Δεν υπάρχουν πωλήσεις.")
 
