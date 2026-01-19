@@ -15,25 +15,42 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.8.1", layout="wide")
+st.set_page_config(page_title="CHERRY v13.8.2", layout="wide")
 st.markdown("""
     <style>
+    /* Γενικό Φόντο */
     .stApp { background-color: #1a1a1a; color: white; }
+    
+    /* Περιοχή Καλαθιού */
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
+    
+    /* Μεγάλο Σύνολο */
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #f1c40f; text-align: center; margin: 10px 0; border: 2px solid #f1c40f; padding: 10px; border-radius: 10px; }
+    
+    /* Στατιστικά Manager */
     .report-stat { background-color: #262730; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; min-height: 80px; }
     .stat-val { font-size: 22px; font-weight: bold; color: #2ecc71; margin: 0; }
     .stat-label { font-size: 12px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     
+    /* --- ΚΟΥΜΠΙΑ ΣΕ ΕΛΑΦΡΥ ΓΚΡΙ --- */
+    div.stButton > button {
+        background-color: #d3d3d3 !important; /* Light Gray */
+        color: #000000 !important;             /* Μαύρα γράμματα */
+        border-radius: 8px !important;
+        border: 1px solid #ffffff !important;
+        font-weight: bold !important;
+    }
+    
+    /* Εξαίρεση για το κουμπί Download Backup (να παραμείνει άσπρο) */
     div.stDownloadButton > button {
         color: #000000 !important;
         background-color: #ffffff !important;
         font-weight: bold !important;
         border: 2px solid #2ecc71 !important;
     }
-    
+
     @media (max-width: 640px) {
         .total-label { font-size: 45px; }
         .stButton>button { height: 3.5em; font-size: 16px !important; }
@@ -52,9 +69,9 @@ if 'audio_enabled' not in st.session_state: st.session_state.audio_enabled = Fal
 
 # --- ΕΛΕΓΧΟΣ ΕΞΟΔΟΥ ---
 if st.session_state.is_logged_out:
-    st.markdown("<h1 style='text-align: center; color: red; margin-top: 100px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>Κάντε ανανέωση (Refresh) στη σελίδα για να συνδεθείτε ξανά.</p>", unsafe_allow_html=True)
-    st.stop() # Σταματάει την εκτέλεση των παρακάτω
+    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray; font-size: 20px;'>Κάντε ανανέωση (Refresh) στη σελίδα για να συνδεθείτε ξανά.</p>", unsafe_allow_html=True)
+    st.stop()
 
 # --- 3. FUNCTIONS ---
 def trigger_alert_sound():
@@ -161,7 +178,7 @@ def display_report(df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.8.1")
+    st.title("CHERRY 13.8.2")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
@@ -169,7 +186,6 @@ with st.sidebar:
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     
     st.write("---")
-    # Το κουμπί ΕΞΟΔΟΣ αλλάζει το state σε True
     if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
         st.session_state.is_logged_out = True
         st.rerun()
