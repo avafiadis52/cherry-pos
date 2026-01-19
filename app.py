@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.6", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.7", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -58,7 +58,6 @@ if st.session_state.is_logged_out:
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
-    # Διόρθωση ώρας για Ελλάδα (UTC + 2)
     return datetime.now() + timedelta(hours=2)
 
 def trigger_alert_sound():
@@ -132,29 +131,56 @@ def finalize(disc_val, method):
 def display_report(sales_df):
     if sales_df.empty:
         st.info("Δεν υπάρχουν δεδομένα."); return
+    
+    # Φόρτωση πελατών
     cust_res = supabase.table("customers").select("id, name").execute()
     cust_df = pd.DataFrame(cust_res.data) if cust_res.data else pd.DataFrame(columns=['id', 'name'])
+    
+    # Προετοιμασία δεδομένων
     df = sales_df.merge(cust_df, left_on='cust_id', right_on='id', how='left')
     df['ΠΕΛΑΤΗΣ'] = df['name'].fillna('Λιανική Πώληση')
-    df = df.sort_values('s_date', ascending=False)
-    unique_trans = df.groupby('s_date').agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
-    unique_trans['ΠΡΑΞΗ'] = range(len(unique_trans), 0, -1)
+    df['s_date_dt'] = pd.to_datetime(df['s_date'])
+    df['day_str'] = df['s_date_dt'].dt.strftime('%Y-%m-%d')
+    
+    # Ομαδοποίηση ανά συναλλαγή (timestamp)
+    unique_trans = df.groupby(['day_str', 's_date']).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
+    unique_trans = unique_trans.sort_values(['day_str', 's_date'], ascending=[False, False])
+    
+    # Υπολογισμός Πράξης ανά ημέρα
+    unique_trans['ΠΡΑΞΗ'] = unique_trans.groupby('day_str').cumcount() + 1
+    
+    # Επιστροφή στο κύριο DF
     df = df.merge(unique_trans[['s_date', 'ΠΡΑΞΗ']], on='s_date')
-    m_df, k_df = unique_trans[unique_trans['method'] == 'Μετρητά'], unique_trans[unique_trans['method'] == 'Κάρτα']
+    df = df.sort_values(['day_str', 's_date'], ascending=[False, False])
+
+    # Stats
+    m_df = unique_trans[unique_trans['method'] == 'Μετρητά']
+    k_df = unique_trans[unique_trans['method'] == 'Κάρτα']
+    
     cols = st.columns(5)
     cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>🎁 ΕΚΠΤΩΣΗ</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>📦 ΤΕΜΑΧΙΑ</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
     cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    st.dataframe(df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('ΠΡΑΞΗ', ascending=False), use_container_width=True, hide_index=True)
+
+    # Εμφάνιση λίστας με διαχωριστικά
+    current_day = None
+    for day, day_data in df.groupby('day_str', sort=False):
+        if current_day is not None:
+            st.markdown("---")
+            st.markdown("#### `========================================================`")
+        
+        st.subheader(f"📅 Ημερομηνία: {datetime.strptime(day, '%Y-%m-%d').strftime('%d/%m/%Y')}")
+        st.dataframe(day_data[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('ΠΡΑΞΗ', ascending=True), use_container_width=True, hide_index=True)
+        current_day = day
 
 # --- 4. MAIN UI ---
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
     
-    st.title("CHERRY 14.0.6")
+    st.title("CHERRY 14.0.7")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
