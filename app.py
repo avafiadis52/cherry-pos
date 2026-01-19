@@ -15,33 +15,35 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.0", layout="wide")
+st.set_page_config(page_title="CHERRY v14.0.1", layout="wide")
 st.markdown("""
     <style>
-    /* Γενικό στυλ */
+    /* Γενικό στυλ εφαρμογής */
     .stApp { background-color: #1a1a1a; color: white; }
     
-    /* Λεζάντες (Labels) έξω από τα πεδία */
+    /* Γενικές Λεζάντες παντού */
     label, [data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 1.1rem !important;
     }
 
-    /* Διόρθωση για το κείμενο ΜΕΣΑ στα πεδία εισαγωγής (Inputs) */
-    input {
-        color: #000000 !important; /* Μαύρο γράμμα για να φαίνεται στο λευκό/γκρι φόντο */
+    /* --- ΕΙΔΙΚΟΣ ΚΑΝΟΝΑΣ ΓΙΑ ΤΟ ΠΑΡΑΘΥΡΟ ΠΛΗΡΩΜΗΣ --- */
+    /* Κάνει όλα τα κείμενα μέσα στα Dialogs σκούρα */
+    div[data-testid="stDialog"] label p, 
+    div[data-testid="stDialog"] h3, 
+    div[data-testid="stDialog"] .stMarkdown p,
+    div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p {
+        color: #111111 !important; /* Πολύ σκούρο γκρι/μαύρο */
     }
-    
-    /* Συγκεκριμένα για το placeholder/label της έκπτωσης */
-    div[data-testid="stTextInput"] label p {
-        color: #ffffff !important;
-    }
+
+    /* Διόρθωση κειμένου μέσα στα inputs */
+    input { color: #000000 !important; }
 
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
-    .final-amount-popup { font-size: 40px; font-weight: bold; color: #f1c40f; text-align: center; margin: 10px 0; border: 2px solid #f1c40f; padding: 10px; border-radius: 10px; }
+    .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; margin: 10px 0; border: 2px solid #e44d26; padding: 10px; border-radius: 10px; background-color: #fff3f0; }
     
     .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
@@ -55,13 +57,7 @@ st.markdown("""
         font-weight: bold !important;
     }
     
-    .data-row {
-        background-color: #262626;
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 5px;
-        border-left: 5px solid #3498db;
-    }
+    .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -97,8 +93,7 @@ def manual_item_popup():
     if st.button("ΠΡΟΣΘΗΚΗ", use_container_width=True):
         if m_name:
             st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
-            st.session_state.bc_key += 1
-            st.rerun()
+            st.session_state.bc_key += 1; st.rerun()
 
 @st.dialog("👤 ΝΕΟΣ ΠΕΛΑΤΗΣ")
 def new_customer_popup(phone=""):
@@ -107,18 +102,16 @@ def new_customer_popup(phone=""):
     if st.button("ΑΠΟΘΗΚΕΥΣΗ", use_container_width=True):
         res = supabase.table("customers").insert({"name": name, "phone": phone_val}).execute()
         if res.data:
-            st.success("Αποθηκεύτηκε!")
-            time.sleep(0.5)
-            st.rerun()
+            st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
 
 @st.dialog("💰 ΠΛΗΡΩΜΗ")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f"<h3 style='text-align:center; color: #888;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
+    # Χρησιμοποιούμε inline style για να είμαστε σίγουροι για το σκούρο χρώμα
+    st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
     opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
     disc = 0.0
     if opt == "ΝΑΙ":
-        # Χρήση label αντί για placeholder για μέγιστη ορατότητα
         inp = st.text_input("Ποσό ή % (π.χ. 10%)")
         if inp:
             try:
@@ -147,16 +140,12 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
-        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(0.5)
-        reset_app()
-    except Exception as e:
-        st.error(f"Σφάλμα: {e}")
+        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!"); time.sleep(0.5); reset_app()
+    except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def display_report(sales_df):
     if sales_df.empty:
-        st.info("Δεν υπάρχουν δεδομένα.")
-        return
+        st.info("Δεν υπάρχουν δεδομένα."); return
     cust_res = supabase.table("customers").select("id, name").execute()
     cust_df = pd.DataFrame(cust_res.data) if cust_res.data else pd.DataFrame(columns=['id', 'name'])
     df = sales_df.merge(cust_df, left_on='cust_id', right_on='id', how='left')
@@ -176,10 +165,9 @@ def display_report(sales_df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 14.0.0")
+    st.title("CHERRY 14.0.1")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
-        st.session_state.is_logged_out = True; st.rerun()
+    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True): st.session_state.is_logged_out = True; st.rerun()
 
 if view == "🛒 ΤΑΜΕΙΟ":
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
