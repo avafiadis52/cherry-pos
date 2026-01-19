@@ -15,17 +15,27 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.9.9", layout="wide")
+st.set_page_config(page_title="CHERRY v14.0.0", layout="wide")
 st.markdown("""
     <style>
     /* Γενικό στυλ */
     .stApp { background-color: #1a1a1a; color: white; }
     
-    /* Διόρθωση για τις λεζάντες (Labels) χωρίς σκιά */
-    label, .stMarkdown p, .css-1pa8d2e, [data-testid="stWidgetLabel"] p {
+    /* Λεζάντες (Labels) έξω από τα πεδία */
+    label, [data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 1.1rem !important;
+    }
+
+    /* Διόρθωση για το κείμενο ΜΕΣΑ στα πεδία εισαγωγής (Inputs) */
+    input {
+        color: #000000 !important; /* Μαύρο γράμμα για να φαίνεται στο λευκό/γκρι φόντο */
+    }
+    
+    /* Συγκεκριμένα για το placeholder/label της έκπτωσης */
+    div[data-testid="stTextInput"] label p {
+        color: #ffffff !important;
     }
 
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
@@ -108,7 +118,7 @@ def payment_popup():
     opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
     disc = 0.0
     if opt == "ΝΑΙ":
-        # Εδώ επαναφέρθηκε το παλιό λεκτικό στο label
+        # Χρήση label αντί για placeholder για μέγιστη ορατότητα
         inp = st.text_input("Ποσό ή % (π.χ. 10%)")
         if inp:
             try:
@@ -166,7 +176,7 @@ def display_report(sales_df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.9.9")
+    st.title("CHERRY 14.0.0")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
         st.session_state.is_logged_out = True; st.rerun()
