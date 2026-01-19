@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.5", layout="wide")
+st.set_page_config(page_title="CHERRY v13.6", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
@@ -23,9 +23,9 @@ st.markdown("""
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #f1c40f; text-align: center; margin: 10px 0; border: 2px solid #f1c40f; padding: 10px; border-radius: 10px; }
-    .report-stat { background-color: #262730; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
-    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
-    .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; }
+    .report-stat { background-color: #262730; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; min-height: 80px; }
+    .stat-val { font-size: 22px; font-weight: bold; color: #2ecc71; margin: 0; }
+    .stat-label { font-size: 12px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     @media (max-width: 640px) {
         .total-label { font-size: 45px; }
         .stButton>button { height: 3.5em; font-size: 16px !important; }
@@ -121,37 +121,35 @@ def display_report(df):
     df = df.sort_values('s_date', ascending=False).reset_index(drop=True)
     group_col = 'transaction_id' if 'transaction_id' in df.columns else 's_date'
     
-    # Ομαδοποίηση για στατιστικά πράξεων
     unique_trans = df.groupby(group_col).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
     unique_trans = unique_trans.sort_index(ascending=False)
     unique_trans['ΠΡΑΞΗ'] = range(len(unique_trans), 0, -1)
     
-    # Προσθήκη αρίθμησης στον κύριο πίνακα
     df = df.merge(unique_trans[[group_col, 'ΠΡΑΞΗ']], on=group_col, how='left')
     
-    # Υπολογισμοί ποσών και πλήθους
     m_df = unique_trans[unique_trans['method'] == 'Μετρητά']
     k_df = unique_trans[unique_trans['method'] == 'Κάρτα']
     
     m_total = m_df['final_item_price'].sum()
     k_total = k_df['final_item_price'].sum()
-    m_count = len(m_df)
-    k_count = len(k_df)
+    total_disc = df['discount'].sum()
+    total_items = len(df)
 
-    # Εμφάνιση Stats (Ταμπακάκια)
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({m_count})</p><p class='stat-val'>{m_total:.1f}€</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({k_count})</p><p class='stat-val'>{k_total:.1f}€</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ ({len(unique_trans)})</p><p class='stat-val'>{m_total + k_total:.1f}€</p></div>", unsafe_allow_html=True)
+    # Εμφάνιση 5 Stats (Ταμπάκια)
+    cols = st.columns(5)
+    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_total:.1f}€</p></div>", unsafe_allow_html=True)
+    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_total:.1f}€</p></div>", unsafe_allow_html=True)
+    cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>🎁 ΕΚΠΤΩΣΗ</p><p class='stat-val'>{total_disc:.1f}€</p></div>", unsafe_allow_html=True)
+    cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>📦 ΤΕΜΑΧΙΑ</p><p class='stat-val'>{total_items}</p></div>", unsafe_allow_html=True)
+    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ</p><p class='stat-val'>{m_total + k_total:.1f}€</p></div>", unsafe_allow_html=True)
     
-    # Πίνακας Αναφοράς
     report_df = df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].copy()
     report_df.columns = ['ΠΡΑΞΗ', 'ΗΜΕΡΟΜΗΝΙΑ', 'ΕΙΔΟΣ', 'ΑΡΧΙΚΗ', 'ΕΚΠΤΩΣΗ', 'ΤΕΛΙΚΗ', 'ΤΡΟΠΟΣ']
     st.dataframe(report_df.sort_values('ΠΡΑΞΗ', ascending=False), use_container_width=True, hide_index=True)
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.5")
+    st.title("CHERRY 13.6")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
