@@ -15,48 +15,27 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.1", layout="wide")
+st.set_page_config(page_title="CHERRY v14.0.4", layout="wide", page_icon="🍒")
+
+st.markdown("""
+    <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
+    <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
+    """, unsafe_allow_html=True)
+
 st.markdown("""
     <style>
-    /* Γενικό στυλ εφαρμογής */
     .stApp { background-color: #1a1a1a; color: white; }
-    
-    /* Γενικές Λεζάντες παντού */
-    label, [data-testid="stWidgetLabel"] p {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
-    }
-
-    /* --- ΕΙΔΙΚΟΣ ΚΑΝΟΝΑΣ ΓΙΑ ΤΟ ΠΑΡΑΘΥΡΟ ΠΛΗΡΩΜΗΣ --- */
-    /* Κάνει όλα τα κείμενα μέσα στα Dialogs σκούρα */
-    div[data-testid="stDialog"] label p, 
-    div[data-testid="stDialog"] h3, 
-    div[data-testid="stDialog"] .stMarkdown p,
-    div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p {
-        color: #111111 !important; /* Πολύ σκούρο γκρι/μαύρο */
-    }
-
-    /* Διόρθωση κειμένου μέσα στα inputs */
+    label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
+    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p, div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p { color: #111111 !important; }
     input { color: #000000 !important; }
-
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; margin: 10px 0; border: 2px solid #e44d26; padding: 10px; border-radius: 10px; background-color: #fff3f0; }
-    
     .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
-
-    div.stButton > button {
-        background-color: #d3d3d3 !important;
-        color: #000000 !important;
-        border-radius: 8px !important;
-        border: 1px solid #ffffff !important;
-        font-weight: bold !important;
-    }
-    
+    div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     </style>
     """, unsafe_allow_html=True)
@@ -71,6 +50,9 @@ if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = Fal
 
 if st.session_state.is_logged_out:
     st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>", unsafe_allow_html=True)
+    if st.button("🔄 ΕΠΑΝΕΚΚΙΝΗΣΗ"):
+        st.session_state.is_logged_out = False
+        st.rerun()
     st.stop()
 
 # --- 3. FUNCTIONS ---
@@ -107,7 +89,6 @@ def new_customer_popup(phone=""):
 @st.dialog("💰 ΠΛΗΡΩΜΗ")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
-    # Χρησιμοποιούμε inline style για να είμαστε σίγουροι για το σκούρο χρώμα
     st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
     opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
     disc = 0.0
@@ -128,6 +109,7 @@ def payment_popup():
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
+    # Χρήση τοπικής ώρας για την εγγραφή
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
@@ -165,9 +147,11 @@ def display_report(sales_df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 14.0.1")
+    st.title("CHERRY 14.0.4")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True): st.session_state.is_logged_out = True; st.rerun()
+    if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
+        st.session_state.is_logged_out = True
+        st.rerun()
 
 if view == "🛒 ΤΑΜΕΙΟ":
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
@@ -213,9 +197,14 @@ elif view == "📊 MANAGER":
     res_all = supabase.table("sales").select("*").execute()
     if res_all.data:
         full_df = pd.DataFrame(res_all.data)
+        # Μετατροπή σε ημερομηνία και διόρθωση format
         full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
+        
         t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ"])
-        with t1: display_report(full_df[full_df['s_date_dt'].dt.date == date.today()])
+        with t1:
+            # Υπολογισμός "σήμερα" κάθε φορά που φορτώνει το tab
+            today_date = date.today()
+            display_report(full_df[full_df['s_date_dt'].dt.date == today_date])
         with t2:
             c1, c2 = st.columns(2)
             d_s, d_e = c1.date_input("Από:", date.today() - timedelta(days=7)), c2.date_input("Έως:", date.today())
