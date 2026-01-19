@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.4", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.5", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -37,6 +37,9 @@ st.markdown("""
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
+    
+    /* Στυλ για την ημερομηνία στο Sidebar */
+    .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; text-align: left; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -109,7 +112,6 @@ def payment_popup():
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
-    # Χρήση τοπικής ώρας για την εγγραφή
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
@@ -147,7 +149,11 @@ def display_report(sales_df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 14.0.4")
+    # Εμφάνιση Ημερομηνίας και Ώρας πάνω αριστερά (στο sidebar)
+    now = datetime.now()
+    st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
+    
+    st.title("CHERRY 14.0.5")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
@@ -197,13 +203,12 @@ elif view == "📊 MANAGER":
     res_all = supabase.table("sales").select("*").execute()
     if res_all.data:
         full_df = pd.DataFrame(res_all.data)
-        # Μετατροπή σε ημερομηνία και διόρθωση format
         full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
         
         t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ"])
         with t1:
-            # Υπολογισμός "σήμερα" κάθε φορά που φορτώνει το tab
-            today_date = date.today()
+            # Δυναμικός υπολογισμός ημερομηνίας τώρα
+            today_date = datetime.now().date()
             display_report(full_df[full_df['s_date_dt'].dt.date == today_date])
         with t2:
             c1, c2 = st.columns(2)
