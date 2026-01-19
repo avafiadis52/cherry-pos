@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.3", layout="wide")
+st.set_page_config(page_title="CHERRY v13.4", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
@@ -84,7 +84,6 @@ def payment_popup():
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
-    # Δημιουργία μοναδικού ID για όλη τη συναλλαγή
     trans_id = datetime.now().strftime("%y%m%d%H%M%S")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -93,11 +92,18 @@ def finalize(disc_val, method):
         f = round(i['price'] - d, 1)
         c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
         
-        supabase.table("sales").insert({
+        # Προσθήκη try/except για την περίπτωση που η στήλη transaction_id δεν υπάρχει ακόμα
+        data_to_insert = {
             "barcode": i['bc'], "item_name": i['name'], "unit_price": i['price'],
             "discount": d, "final_item_price": f, "method": method, 
             "s_date": ts, "cust_id": c_id, "transaction_id": trans_id
-        }).execute()
+        }
+        try:
+            supabase.table("sales").insert(data_to_insert).execute()
+        except:
+            # Αν αποτύχει λόγω transaction_id, το αφαιρούμε και ξαναδοκιμάζουμε
+            data_to_insert.pop("transaction_id", None)
+            supabase.table("sales").insert(data_to_insert).execute()
         
         res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).single().execute()
         if res.data:
@@ -114,44 +120,41 @@ def display_report(df):
         st.info("Δεν βρέθηκαν δεδομένα.")
         return
     
-    # Μετατροπή ημερομηνίας
     df = df.sort_values('s_date', ascending=False).reset_index(drop=True)
     
-    # Ομαδοποίηση ανά transaction_id για να βρούμε τις μοναδικές πράξεις
-    unique_trans = df.groupby('transaction_id').agg({
+    # Εδώ διορθώνουμε το KeyError: ελέγχουμε αν υπάρχει η στήλη transaction_id
+    group_col = 'transaction_id' if 'transaction_id' in df.columns else 's_date'
+    
+    unique_trans = df.groupby(group_col).agg({
         'final_item_price': 'sum',
         'method': 'first'
     }).reset_index()
     
-    # Προσθήκη αρίθμησης ΠΡΑΞΗ
     unique_trans = unique_trans.sort_index(ascending=False)
     unique_trans['ΠΡΑΞΗ'] = range(len(unique_trans), 0, -1)
     
-    # Σύνδεση της αρίθμησης ΠΡΑΞΗ πίσω στο αρχικό dataframe
-    df = df.merge(unique_trans[['transaction_id', 'ΠΡΑΞΗ']], on='transaction_id', how='left')
+    df = df.merge(unique_trans[[group_col, 'ΠΡΑΞΗ']], on=group_col, how='left')
     
-    # Υπολογισμοί για τα boxes
     m_val = unique_trans[unique_trans['method'] == 'Μετρητά']['final_item_price'].sum()
     k_val = unique_trans[unique_trans['method'] == 'Κάρτα']['final_item_price'].sum()
-    m_count = len(unique_trans[unique_trans['method'] == 'Μετρητά'])
-    k_count = len(unique_trans[unique_trans['method'] == 'Κάρτα'])
     
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ</p><p class='stat-val'>{m_val:.1f}€</p></div>", unsafe_allow_html=True)
     c2.markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ</p><p class='stat-val'>{k_val:.1f}€</p></div>", unsafe_allow_html=True)
     c3.markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ</p><p class='stat-val'>{m_val+k_val:.1f}€</p></div>", unsafe_allow_html=True)
     c4.markdown(f"<div class='report-stat'><p class='stat-label'>🔢 ΣΥΝ. ΠΡΑΞΕΙΣ</p><p class='stat-val'>{len(unique_trans)}</p></div>", unsafe_allow_html=True)
-    c5.markdown(f"<div class='report-stat'><p class='stat-label'>📊 Μ/Κ</p><p class='stat-val'>{m_count}/{k_count}</p></div>", unsafe_allow_html=True)
+    c5.markdown(f"<div class='report-stat'><p class='stat-label'>📊 Μ/Κ</p><p class='stat-val'>{len(unique_trans[unique_trans['method'] == 'Μετρητά'])}/{len(unique_trans[unique_trans['method'] == 'Κάρτα'])}</p></div>", unsafe_allow_html=True)
     
-    # Μετονομασία στηλών για την αναφορά
-    report_df = df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].copy()
+    # Εμφάνιση πίνακα
+    cols_to_show = ['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']
+    report_df = df[cols_to_show].copy()
     report_df.columns = ['ΠΡΑΞΗ', 'ΗΜΕΡΟΜΗΝΙΑ', 'ΕΙΔΟΣ', 'ΑΡΧΙΚΗ ΤΙΜΗ', 'ΕΚΠΤΩΣΗ', 'ΤΕΛΙΚΗ ΤΙΜΗ', 'ΤΡΟΠΟΣ']
     
-    st.dataframe(report_df.sort_values(['ΠΡΑΞΗ', 'ΗΜΕΡΟΜΗΝΙΑ'], ascending=[False, False]), use_container_width=True, hide_index=True)
+    st.dataframe(report_df.sort_values('ΠΡΑΞΗ', ascending=False), use_container_width=True, hide_index=True)
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.3")
+    st.title("CHERRY 13.4")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
