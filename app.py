@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v13.6", layout="wide")
+st.set_page_config(page_title="CHERRY v13.7", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
@@ -135,7 +135,6 @@ def display_report(df):
     total_disc = df['discount'].sum()
     total_items = len(df)
 
-    # Εμφάνιση 5 Stats (Ταμπάκια)
     cols = st.columns(5)
     cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_total:.1f}€</p></div>", unsafe_allow_html=True)
     cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_total:.1f}€</p></div>", unsafe_allow_html=True)
@@ -149,7 +148,7 @@ def display_report(df):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 13.6")
+    st.title("CHERRY 13.7")
     if not st.session_state.audio_enabled:
         if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ", use_container_width=True):
             st.session_state.audio_enabled = True; trigger_alert_sound(); st.rerun()
@@ -195,11 +194,18 @@ if view == "🛒 ΤΑΜΕΙΟ":
 
 elif view == "📊 MANAGER":
     st.header("📊 Αναφορές Πωλήσεων")
+    
+    # Φόρτωση όλων των δεδομένων για backup
+    res_all = supabase.table("sales").select("*").execute()
+    if res_all.data:
+        full_df = pd.DataFrame(res_all.data)
+        csv = full_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 DOWNLOAD BACKUP (CSV)", csv, "cherry_sales_backup.csv", "text/csv", use_container_width=True)
+    
     t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
     
-    res = supabase.table("sales").select("*").execute()
-    if res.data:
-        all_df = pd.DataFrame(res.data)
+    if res_all.data:
+        all_df = pd.DataFrame(res_all.data)
         all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
         
         with t1:
