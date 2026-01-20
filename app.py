@@ -3,7 +3,6 @@ from datetime import datetime, date, timedelta
 import time
 import streamlit as st
 from supabase import create_client, Client
-import base64
 
 # --- 1. SUPABASE SETUP ---
 SUPABASE_URL = "https://hnwynihjkdkryrfepenh.supabase.co"
@@ -16,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.24", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.25", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -44,73 +43,20 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
+if 'trigger_sound' not in st.session_state: st.session_state.trigger_sound = False
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
-def play_cash_sound():
-    """Ενισχυμένη μέθοδος αναπαραγωγής ήχου"""
-    sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
-    sound_html = f"""
-    <iframe src="{sound_url}" allow="autoplay" style="display:none" id="iframeAudio"></iframe>
-    <audio autoplay>
-        <source src="{sound_url}" type="audio/mpeg">
-    </audio>
-    <script>
-        var audio = new Audio("{sound_url}");
-        audio.play().catch(function(error) {{
-            console.log("Autoplay blocked: " + error);
-        }});
-    </script>
-    """
-    st.markdown(sound_html, unsafe_allow_html=True)
-
 def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
+    st.session_state.trigger_sound = False
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.rerun()
-
-@st.dialog("📦 Ελεύθερο Είδος (999)")
-def manual_item_popup():
-    m_name = st.text_input("Όνομα Είδους")
-    m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1)
-    if st.button("Προσθήκη", use_container_width=True):
-        if m_name:
-            st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
-            st.session_state.bc_key += 1; st.rerun()
-
-@st.dialog("👤 Νέος Πελάτης")
-def new_customer_popup(phone=""):
-    name = st.text_input("Ονοματεπώνυμο")
-    phone_val = st.text_input("Τηλέφωνο", value=phone)
-    if st.button("Αποθήκευση", use_container_width=True):
-        res = supabase.table("customers").insert({"name": name, "phone": phone_val}).execute()
-        if res.data:
-            st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
-
-@st.dialog("💰 Πληρωμή")
-def payment_popup():
-    total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
-    opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
-    disc = 0.0
-    if opt == "ΝΑΙ":
-        inp = st.text_input("Ποσό ή %")
-        if inp:
-            try:
-                if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
-                else: disc = round(float(inp), 2)
-            except: st.error("Σφάλμα")
-    final_p = round(total - disc, 2)
-    st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
-    st.divider()
-    c1, c2 = st.columns(2)
-    if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
-    if c2.button("💳 Κάρτα", use_container_width=True): finalize(disc, "Κάρτα")
 
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
@@ -128,12 +74,37 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        play_cash_sound()
-        st.balloons()
-        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.5)
-        reset_app()
+        st.session_state.trigger_sound = True # Ενεργοποίηση ήχου
+        st.rerun()
     except Exception as e: st.error(f"Σφάλμα: {e}")
+
+@st.dialog("💰 Πληρωμή")
+def payment_popup():
+    total = sum(i['price'] for i in st.session_state.cart)
+    st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
+    opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
+    disc = 0.0
+    if opt == "ΝΑΙ":
+        inp = st.text_input("Ποσό ή %")
+        if inp:
+            try:
+                if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
+                else: disc = round(float(inp), 2)
+            except: st.error("Σφάλμα")
+    final_p = round(total - disc, 2)
+    st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
+    if c2.button("💳 Κάρτα", use_container_width=True): finalize(disc, "Κάρτα")
+
+@st.dialog("📦 Ελεύθερο Είδος (999)")
+def manual_item_popup():
+    m_name = st.text_input("Όνομα Είδους")
+    m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1)
+    if st.button("Προσθήκη", use_container_width=True):
+        if m_name:
+            st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
+            st.session_state.bc_key += 1; st.rerun()
 
 def display_report(sales_df):
     if sales_df.empty:
@@ -159,13 +130,27 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.24")
+    st.title("CHERRY 14.0.25")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True): 
-        st.session_state.is_logged_out = True
-        st.rerun()
 
 if view == "🛒 ΤΑΜΕΙΟ":
+    if st.session_state.trigger_sound:
+        # Ειδικό HTML για αναγκαστικό ήχο και μπαλόνια
+        sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
+        st.markdown(f"""
+            <audio id="cashAudio" autoplay>
+                <source src="{sound_url}" type="audio/mpeg">
+            </audio>
+            <script>
+                var audio = document.getElementById("cashAudio");
+                audio.play();
+            </script>
+            """, unsafe_allow_html=True)
+        st.balloons()
+        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(2)
+        reset_app()
+
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
     cl, cr = st.columns([1, 1.5])
     with cl:
@@ -176,7 +161,6 @@ if view == "🛒 ΤΑΜΕΙΟ":
                 if res.data: 
                     st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
                     st.rerun()
-                else: new_customer_popup(ph.strip())
             if st.button("🛒 ΛΙΑΝΙΚΗ", use_container_width=True): 
                 st.session_state.selected_cust_id = 0
                 st.session_state.cust_name = "Λιανική Πώληση"
@@ -201,8 +185,8 @@ if view == "🛒 ΤΑΜΕΙΟ":
         if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
     with cr:
         total = sum(i['price'] for i in st.session_state.cart)
-        lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
-        st.markdown(f"<div class='cart-area'>{'ΕΙΔΟΣ':<20} | {'ΤΙΜΗ':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
+        cart_text = "\n".join([f"{i[0]+1}. {i[1]['name']} - {i[1]['price']}€" for i in enumerate(st.session_state.cart)])
+        st.markdown(f"<div class='cart-area'>{cart_text}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
 elif view == "📊 MANAGER":
