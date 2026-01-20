@@ -15,7 +15,25 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.1.7", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.1.8", layout="wide", page_icon="🍒")
+
+# Έλεγχος Logout - Αν είναι logged out, δείχνει ΜΟΝΟ το μήνυμα και σταματάει
+if st.session_state.get('is_logged_out', False):
+    st.markdown("""
+        <style>
+            [data-testid="stSidebar"] {display: none;}
+            .stApp {background-color: #1a1a1a;}
+        </style>
+        <div style='text-align: center; padding-top: 150px;'>
+            <h1 style='color: #e74c3c; font-size: 50px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>
+            <p style='color: white;'>Όλα τα δεδομένα καθαρίστηκαν.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("🔄 ΕΠΑΝΕΚΚΙΝΗΣΗ (Login)"):
+        st.session_state.clear()
+        st.session_state.is_logged_out = False
+        st.rerun()
+    st.stop()
 
 st.markdown("""
     <style>
@@ -42,15 +60,6 @@ if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id
 if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανική Πώληση"
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
-if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-
-# Logout Handling
-if st.session_state.is_logged_out:
-    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>", unsafe_allow_html=True)
-    if st.button("🔄 ΕΠΑΝΕΚΚΙΝΗΣΗ"):
-        st.session_state.is_logged_out = False
-        st.rerun()
-    st.stop()
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -65,48 +74,30 @@ def reset_app():
 
 @st.dialog("📦 ΕΛΕΥΘΕΡΟ ΕΙΔΟΣ (999)")
 def manual_item_popup():
-    st.write("Πείτε π.χ.: 'Ανταύγειες και τριάντα ευρώ'")
-    
-    # 1. Φωνητική Λήψη
-    res = st.text_input("Voice Buffer", key="voice_buffer", label_visibility="collapsed")
-    
-    st.components.v1.html(f"""
+    st.write("Πείτε: '[Όνομα] και [Τιμή]'")
+    st.components.v1.html("""
     <script>
     const recognition = new (window.webkitSpeechRecognition || window.Recognition)();
     recognition.lang = 'el-GR';
-    recognition.onresult = function(event) {{
+    recognition.onresult = function(event) {
         const text = event.results[0][0].transcript;
         const parent = window.parent.document;
+        let parts = text.split(" και ");
+        let name = parts[0] || "";
+        let price = (parts[1] || "").replace(/[^0-9,.]/g, '').replace(',', '.');
         const inputs = parent.querySelectorAll('input');
-        // Βρίσκουμε το Voice Buffer input
-        for (let input of inputs) {{
-            if (input.value === "{res}") {{
-                input.value = text;
-                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                break;
-            }}
-        }}
-    }};
+        inputs.forEach(input => {
+            if (input.ariaLabel === "Όνομα Είδους") { input.value = name; input.dispatchEvent(new Event('input', { bubbles: true })); }
+            if (input.type === "number") { input.value = price; input.dispatchEvent(new Event('input', { bubbles: true })); }
+        });
+    };
     </script>
-    <button onclick="recognition.start()" style="width:100%; height:50px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; border:none; cursor:pointer;">🎤 ΠΑΤΗΣΤΕ ΚΑΙ ΜΙΛΗΣΤΕ</button>
+    <button onclick="recognition.start()" style="width:100%; height:45px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:10px;">🎤 ΦΩΝΗΤΙΚΗ ΕΝΤΟΛΗ</button>
     """, height=60)
-
-    # Αν η φωνή έγραψε κάτι στο buffer
-    if res and " και " in res:
-        parts = res.split(" και ")
-        v_name = parts[0].strip()
-        v_price_raw = parts[1].replace("ευρώ", "").replace("€", "").strip()
-        try:
-            v_price = float(v_price_raw.replace(",", "."))
-            st.session_state.cart.append({'bc': '999', 'name': v_name, 'price': round(v_price, 2)})
-            st.session_state.bc_key += 1
-            st.rerun()
-        except: st.error("Δεν καταλάβα την τιμή")
-
-    st.write("--- Ή Χειροκίνητα ---")
+    
     m_name = st.text_input("Όνομα Είδους")
     m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1)
-    if st.button("ΠΡΟΣΘΗΚΗ ΧΕΙΡΟΚΙΝΗΤΑ", use_container_width=True):
+    if st.button("ΠΡΟΣΘΗΚΗ", use_container_width=True):
         if m_name and m_price > 0:
             st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
             st.session_state.bc_key += 1; st.rerun()
@@ -167,26 +158,26 @@ def display_report(sales_df):
     df['day_str'] = df['s_date_dt'].dt.strftime('%Y-%m-%d')
     df = df.sort_values('s_date', ascending=True)
     unique_trans = df.groupby(['day_str', 's_date']).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
-    unique_trans = unique_trans.sort_values(['day_str', 's_date'], ascending=[True, True])
     unique_trans['ΠΡΑΞΗ'] = unique_trans.groupby('day_str').cumcount() + 1
     df = df.merge(unique_trans[['s_date', 'ΠΡΑΞΗ']], on='s_date')
     m_df, k_df = unique_trans[unique_trans['method'] == 'Μετρητά'], unique_trans[unique_trans['method'] == 'Κάρτα']
     cols = st.columns(5)
-    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>🎁 ΕΚΠΤΩΣΗ</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>📦 ΤΕΜΑΧΙΑ</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
-    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     for day, day_data in df.groupby('day_str', sort=True):
         st.subheader(f"📅 {datetime.strptime(day, '%Y-%m-%d').strftime('%d/%m/%Y')}")
-        st.dataframe(day_data[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('ΠΡΑΞΗ', ascending=True), use_container_width=True, hide_index=True)
+        st.dataframe(day_data[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']], use_container_width=True, hide_index=True)
 
 # --- 4. MAIN UI ---
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.1.7")
+    st.title("CHERRY 14.1.8")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
+    st.write("---")
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
         st.rerun()
@@ -199,9 +190,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
             ph = st.text_input("Τηλέφωνο Πελάτη", key=f"ph_{st.session_state.ph_key}")
             if ph:
                 res = supabase.table("customers").select("*").eq("phone", ph.strip()).execute()
-                if res.data: 
-                    st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
-                    st.rerun()
+                if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
                 else: new_customer_popup(ph.strip())
             if st.button("🛒 ΛΙΑΝΙΚΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
         else:
