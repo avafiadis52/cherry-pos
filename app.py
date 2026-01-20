@@ -64,7 +64,8 @@ def trigger_alert_sound():
     sound_url = "https://www.soundjay.com/buttons/beep-01a.mp3"
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
-def play_coins_sound():
+def play_success_sound():
+    # Ήχος ολοκλήρωσης πληρωμής (Cash Register)
     sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
@@ -130,9 +131,10 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        play_coins_sound()
+        # Ενεργοποίηση ήχου και εμφάνιση μηνύματος
+        play_success_sound()
         st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.2) 
+        time.sleep(1.0)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -175,6 +177,7 @@ with st.sidebar:
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
     st.title("CHERRY 14.0.9")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
+    
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
         st.session_state.selected_cust_id = None
