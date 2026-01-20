@@ -48,9 +48,13 @@ def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def play_cash_sound():
-    # Ήχος κερμάτων / ταμείου
-    sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
-    st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
+    # Ενισχυμένος κώδικας για ήχο κερμάτων
+    sound_html = """
+    <audio autoplay>
+      <source src="https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3" type="audio/mpeg">
+    </audio>
+    """
+    st.components.v1.html(sound_html, height=0)
 
 def reset_app():
     st.session_state.cart = []
@@ -132,8 +136,8 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data: supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        play_cash_sound() # Προσθήκη ήχου
-        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!"); time.sleep(0.8); reset_app()
+        play_cash_sound() # ΕΚΤΕΛΕΣΗ ΗΧΟΥ
+        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!"); time.sleep(1.0); reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def display_report(sales_df):
