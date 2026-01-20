@@ -139,26 +139,35 @@ def finalize(disc_val, method):
 def display_report(sales_df):
     if sales_df.empty:
         st.info("Δεν υπάρχουν δεδομένα."); return
+    
     cust_res = supabase.table("customers").select("id, name").execute()
     cust_df = pd.DataFrame(cust_res.data) if cust_res.data else pd.DataFrame(columns=['id', 'name'])
+    
     df = sales_df.merge(cust_df, left_on='cust_id', right_on='id', how='left')
     df['ΠΕΛΑΤΗΣ'] = df['name'].fillna('Λιανική Πώληση')
     df['s_date_dt'] = pd.to_datetime(df['s_date'])
     df['day_str'] = df['s_date_dt'].dt.strftime('%Y-%m-%d')
+    
     df = df.sort_values('s_date', ascending=True)
+    
     unique_trans = df.groupby(['day_str', 's_date']).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
     unique_trans['ΠΡΑΞΗ'] = unique_trans.groupby('day_str').cumcount() + 1
+    
     df = df.merge(unique_trans[['s_date', 'ΠΡΑΞΗ']], on='s_date')
-    m_df, k_df = unique_trans[unique_trans['method'] == 'Μετρητά'], unique_trans[unique_trans['method'] == 'Κάρτα']
+
+    m_df = unique_trans[unique_trans['method'] == 'Μετρητά']
+    k_df = unique_trans[unique_trans['method'] == 'Κάρτα']
+    
     cols = st.columns(5)
-    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>🎁 ΕΚΠΤΩΣΗ</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>📦 ΤΕΜΑΧΙΑ</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
-    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+
     for day, day_data in df.groupby('day_str', sort=True):
         st.subheader(f"📅 {datetime.strptime(day, '%Y-%m-%d').strftime('%d/%m/%Y')}")
-        st.dataframe(day_data[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']], use_container_width=True, hide_index=True)
+        st.dataframe(day_data[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('ΠΡΑΞΗ', ascending=True), use_container_width=True, hide_index=True)
 
 # --- 4. MAIN UI ---
 with st.sidebar:
