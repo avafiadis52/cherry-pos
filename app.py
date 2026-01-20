@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.10", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.11", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -64,16 +64,6 @@ def trigger_alert_sound():
     sound_url = "https://www.soundjay.com/buttons/beep-01a.mp3"
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
-def play_success_sound():
-    # Ήχος Ταμειακής (Cash Register)
-    sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
-    st.components.v1.html(f"""
-        <script>
-            var audio = new Audio("{sound_url}");
-            audio.play().catch(function(e) {{ console.log("Sound error:", e); }});
-        </script>
-    """, height=0)
-
 def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
@@ -116,13 +106,16 @@ def payment_popup():
     final_p = round(total - disc, 2)
     st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
+    
+    # ΝΕΑ ΜΕΘΟΔΟΣ ΗΧΟΥ: Ο ήχος παίζει άμεσα με το κλικ του κουμπιού
     c1, c2 = st.columns(2)
-    # Προσθήκη ήχου αμέσως στο κλικ
-    if c1.button("💵 Μετρητά", use_container_width=True): 
-        play_success_sound()
+    
+    if c1.button("💵 Μετρητά", use_container_width=True):
+        st.components.v1.html("""<script>new Audio("https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3").play();</script>""", height=0)
         finalize(disc, "Μετρητά")
-    if c2.button("💳 Κάρτα", use_container_width=True): 
-        play_success_sound()
+        
+    if c2.button("💳 Κάρτα", use_container_width=True):
+        st.components.v1.html("""<script>new Audio("https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3").play();</script>""", height=0)
         finalize(disc, "Κάρτα")
 
 def finalize(disc_val, method):
@@ -130,7 +123,6 @@ def finalize(disc_val, method):
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
-    
     try:
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
@@ -150,29 +142,23 @@ def finalize(disc_val, method):
 def display_report(sales_df):
     if sales_df.empty:
         st.info("Δεν υπάρχουν δεδομένα."); return
-    
     cust_res = supabase.table("customers").select("id, name").execute()
     cust_df = pd.DataFrame(cust_res.data) if cust_res.data else pd.DataFrame(columns=['id', 'name'])
-    
     df = sales_df.merge(cust_df, left_on='cust_id', right_on='id', how='left')
     df['ΠΕΛΑΤΗΣ'] = df['name'].fillna('Λιανική Πώληση')
     df['s_date_dt'] = pd.to_datetime(df['s_date'])
     df['day_str'] = df['s_date_dt'].dt.strftime('%Y-%m-%d')
     df = df.sort_values('s_date', ascending=True)
-    
     unique_trans = df.groupby(['day_str', 's_date']).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
     unique_trans['ΠΡΑΞΗ'] = unique_trans.groupby('day_str').cumcount() + 1
     df = df.merge(unique_trans[['s_date', 'ΠΡΑΞΗ']], on='s_date')
-
     m_df, k_df = unique_trans[unique_trans['method'] == 'Μετρητά'], unique_trans[unique_trans['method'] == 'Κάρτα']
-    
     cols = st.columns(5)
     cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>🎁 ΕΚΠΤΩΣΗ</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>📦 ΤΕΜΑΧΙΑ</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
     cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-
     for day, day_data in df.groupby('day_str', sort=True):
         st.subheader(f"📅 {datetime.strptime(day, '%Y-%m-%d').strftime('%d/%m/%Y')}")
         st.dataframe(day_data[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('ΠΡΑΞΗ', ascending=True), use_container_width=True, hide_index=True)
@@ -181,7 +167,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.10")
+    st.title("CHERRY 14.0.11")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -214,7 +200,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
                     else: 
-                        trigger_alert_sound()
+                        st.components.v1.html("""<script>new Audio("https://www.soundjay.com/buttons/beep-01a.mp3").play();</script>""", height=0)
                         st.error("Barcode δεν βρέθηκε!")
                         st.session_state.bc_key += 1
             for idx, item in enumerate(st.session_state.cart):
