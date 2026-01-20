@@ -2,7 +2,7 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import time
 import streamlit as st
-import streamlit.components.v1 as components
+import re
 from supabase import create_client, Client
 
 # --- 1. SUPABASE SETUP ---
@@ -16,7 +16,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.1.5", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.1.6", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -45,6 +45,7 @@ if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 
+# Έλεγχος για έξοδο
 if st.session_state.is_logged_out:
     st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>", unsafe_allow_html=True)
     if st.button("🔄 ΕΠΑΝΕΚΚΙΝΗΣΗ"):
@@ -55,10 +56,6 @@ if st.session_state.is_logged_out:
 # --- 3. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
-
-def trigger_alert_sound():
-    sound_url = "https://www.soundjay.com/buttons/beep-01a.mp3"
-    components.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
 def reset_app():
     st.session_state.cart = []
@@ -72,41 +69,62 @@ def reset_app():
 def manual_item_popup():
     st.write("Πείτε: '[Όνομα] και [Τιμή]'")
     
-    # Το JavaScript στέλνει τα δεδομένα πίσω στο Streamlit μέσω του st_callback
-    val = components.html("""
+    # JavaScript που γεμίζει τα inputs και μετά κάνει "κλικ" στο κουμπί Προσθήκη αυτόματα
+    st.components.v1.html("""
     <script>
     const recognition = new (window.webkitSpeechRecognition || window.Recognition)();
     recognition.lang = 'el-GR';
+    
     function startRec() { recognition.start(); }
+
     recognition.onresult = function(event) {
         const text = event.results[0][0].transcript;
-        window.parent.postMessage({type: 'voice_input', data: text}, '*');
+        const parent = window.parent.document;
+        let parts = text.split(" και ");
+        let name = parts[0] || "";
+        let price = (parts[1] || "").replace(/[^0-9,.]/g, '').replace(',', '.');
+        
+        // Στόχευση των πεδίων
+        const inputs = parent.querySelectorAll('input');
+        let nameInput, priceInput;
+        
+        inputs.forEach(input => {
+            if (input.ariaLabel === "Όνομα Είδους") nameInput = input;
+            if (input.type === "number") priceInput = input;
+        });
+
+        if (nameInput && priceInput) {
+            nameInput.value = name;
+            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            priceInput.value = price;
+            priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+            
+            // Μικρή καθυστέρηση για να προλάβει το Streamlit να δει την αλλαγή
+            setTimeout(() => {
+                const buttons = parent.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.innerText.includes("ΟΛΟΚΛΗΡΩΣΗ ΠΡΟΣΘΗΚΗΣ")) {
+                        btn.click();
+                    }
+                });
+            }, 500);
+        }
     };
     </script>
-    <button onclick="startRec()" style="width:100%; height:50px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:15px;">🎤 ΠΑΤΗΣΤΕ ΓΙΑ ΦΩΝΗΤΙΚΗ ΕΝΤΟΛΗ</button>
+    <button onclick="startRec()" style="width:100%; height:50px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:10px;">🎤 ΠΑΤΗΣΤΕ & ΜΙΛΗΣΤΕ</button>
     """, height=70)
 
-    # Listener για το μήνυμα από το JS
-    import streamlit_js_eval
-    voice_data = streamlit_js_eval.streamlit_js_eval(js_expressions="window.addEventListener('message', function(e) { if(e.data.type === 'voice_input') return e.data.data; })", want_output=True, key="voice_listener")
+    m_name = st.text_input("Όνομα Είδους", key="m_name_input")
+    m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1, key="m_price_input")
     
-    if voice_data:
-        parts = voice_data.split(" και ")
-        v_name = parts[0]
-        v_price = (parts[1] if len(parts)>1 else "0").replace(/[^0-9,.]/g, '').replace(',', '.')
-        if v_name and float(v_price) > 0:
-            st.session_state.cart.append({'bc': '999', 'name': v_name, 'price': round(float(v_price), 2)})
-            st.session_state.bc_key += 1
-            st.rerun()
-
-    st.write("--- Ή Χειροκίνητα ---")
-    m_name = st.text_input("Όνομα Είδους", key="manual_n")
-    m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1, key="manual_p")
-    if st.button("ΠΡΟΣΘΗΚΗ", use_container_width=True):
+    # Αυτό το κουμπί πατιέται αυτόματα από το script
+    if st.button("ΟΛΟΚΛΗΡΩΣΗ ΠΡΟΣΘΗΚΗΣ", use_container_width=True):
         if m_name and m_price > 0:
             st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
             st.session_state.bc_key += 1
             st.rerun()
+        else:
+            st.error("Συμπληρώστε όνομα και τιμή")
 
 @st.dialog("👤 ΝΕΟΣ ΠΕΛΑΤΗΣ")
 def new_customer_popup(phone=""):
@@ -114,8 +132,7 @@ def new_customer_popup(phone=""):
     phone_val = st.text_input("Τηλέφωνο", value=phone)
     if st.button("ΑΠΟΘΗΚΕΥΣΗ", use_container_width=True):
         res = supabase.table("customers").insert({"name": name, "phone": phone_val}).execute()
-        if res.data:
-            st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+        if res.data: st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
 
 @st.dialog("💰 ΠΛΗΡΩΜΗ")
 def payment_popup():
@@ -184,7 +201,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.1.5")
+    st.title("CHERRY 14.1.6")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
@@ -214,8 +231,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         item = res.data[0]
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
-                    else: 
-                        trigger_alert_sound(); st.error("Barcode δεν βρέθηκε!"); st.session_state.bc_key += 1
+                    else: st.error("Barcode δεν βρέθηκε!"); st.session_state.bc_key += 1
             for idx, item in enumerate(st.session_state.cart):
                 if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
                     st.session_state.cart.pop(idx); st.rerun()
@@ -259,3 +275,10 @@ elif view == "👥 ΠΕΛΑΤΕΣ":
     with st.form("c_form", clear_on_submit=True):
         cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
         if st.form_submit_button("💾 ΕΓΓΡΑΦΗ", use_container_width=True):
+            if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
+    st.write("---")
+    res = supabase.table("customers").select("*").execute()
+    if res.data:
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
+            if st.button("ΔΙΑΓΡΑΦΗ", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
