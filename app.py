@@ -15,7 +15,12 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.1.3", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.1.4", layout="wide", page_icon="🍒")
+
+st.markdown("""
+    <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
+    <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
+    """, unsafe_allow_html=True)
 
 st.markdown("""
     <style>
@@ -44,15 +49,12 @@ if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 
-# --- ΦΩΝΗΤΙΚΟΣ ΕΛΕΓΧΟΣ (AUTO-ADD) ---
-q_params = st.query_params
-if "v_name" in q_params and "v_price" in q_params:
-    v_n = q_params["v_name"]
-    v_p = float(q_params["v_price"])
-    st.session_state.cart.append({'bc': '999', 'name': v_n, 'price': round(v_p, 2)})
-    st.query_params.clear()
-    st.session_state.bc_key += 1
-    st.rerun()
+if st.session_state.is_logged_out:
+    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>", unsafe_allow_html=True)
+    if st.button("🔄 ΕΠΑΝΕΚΚΙΝΗΣΗ"):
+        st.session_state.is_logged_out = False
+        st.rerun()
+    st.stop()
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -66,44 +68,52 @@ def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
-    st.session_state.bc_key += 1; st.session_state.ph_key += 1
+    st.session_state.bc_key += 1
+    st.session_state.ph_key += 1
     st.rerun()
 
 @st.dialog("📦 ΕΛΕΥΘΕΡΟ ΕΙΔΟΣ (999)")
 def manual_item_popup():
-    st.write("Πείτε π.χ.: 'Κούρεμα και δέκα ευρώ'")
+    st.write("Πείτε: '[Όνομα] και [Τιμή] ευρώ'")
     
-    st.components.v1.html("""
+    # Το component επιστρέφει τιμή αν γίνει φωνητική λήψη
+    res = st.components.v1.html("""
     <script>
     const recognition = new (window.webkitSpeechRecognition || window.Recognition)();
     recognition.lang = 'el-GR';
-    
     function startRec() { recognition.start(); }
-
     recognition.onresult = function(event) {
-        const result = event.results[0][0].transcript;
-        let parts = result.split(" και ");
+        const text = event.results[0][0].transcript;
+        const parent = window.parent.document;
+        let parts = text.split(" και ");
         let name = parts[0] || "";
-        let priceStr = parts[1] || "";
-        let price = priceStr.replace(/[^0-9,.]/g, '').replace(',', '.');
+        let price = (parts[1] || "").replace(/[^0-9,.]/g, '').replace(',', '.');
         
-        if(name && price) {
-            const url = new URL(window.parent.location.href);
-            url.searchParams.set("v_name", name);
-            url.searchParams.set("v_price", price);
-            window.parent.location.href = url.href;
-        }
+        // Γεμίζουμε τα input πεδία απευθείας
+        const inputs = parent.querySelectorAll('input');
+        inputs.forEach(input => {
+            if (input.ariaLabel === "Όνομα Είδους") {
+                input.value = name;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (input.type === "number") {
+                input.value = price;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
     };
     </script>
-    <button onclick="startRec()" style="width:100%; height:50px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none;">🎤 ΠΕΙΤΕ ΟΝΟΜΑ ΚΑΙ ΤΙΜΗ</button>
-    """, height=70)
+    <button onclick="startRec()" style="width:100%; height:45px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:10px;">🎤 ΠΑΤΗΣΤΕ & ΜΙΛΗΣΤΕ</button>
+    """, height=60)
 
     m_name = st.text_input("Όνομα Είδους")
     m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1)
-    if st.button("ΠΡΟΣΘΗΚΗ ΧΕΙΡΟΚΙΝΗΤΑ", use_container_width=True):
-        if m_name:
+    
+    if st.button("ΠΡΟΣΘΗΚΗ", use_container_width=True):
+        if m_name and m_price > 0:
             st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
-            st.session_state.bc_key += 1; st.rerun()
+            st.session_state.bc_key += 1
+            st.rerun()
 
 @st.dialog("👤 ΝΕΟΣ ΠΕΛΑΤΗΣ")
 def new_customer_popup(phone=""):
@@ -111,7 +121,8 @@ def new_customer_popup(phone=""):
     phone_val = st.text_input("Τηλέφωνο", value=phone)
     if st.button("ΑΠΟΘΗΚΕΥΣΗ", use_container_width=True):
         res = supabase.table("customers").insert({"name": name, "phone": phone_val}).execute()
-        if res.data: st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+        if res.data:
+            st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
 
 @st.dialog("💰 ΠΛΗΡΩΜΗ")
 def payment_popup():
@@ -146,7 +157,8 @@ def finalize(disc_val, method):
             supabase.table("sales").insert(data).execute()
             if i['bc'] != '999':
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
-                if res.data: supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
+                if res.data:
+                    supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!"); time.sleep(0.5); reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -179,7 +191,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.1.3")
+    st.title("CHERRY 14.1.4")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
