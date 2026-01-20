@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.11", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.12", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -60,10 +60,6 @@ if st.session_state.is_logged_out:
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
-def trigger_alert_sound():
-    sound_url = "https://www.soundjay.com/buttons/beep-01a.mp3"
-    st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
-
 def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
@@ -107,16 +103,17 @@ def payment_popup():
     st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
     
-    # ΝΕΑ ΜΕΘΟΔΟΣ ΗΧΟΥ: Ο ήχος παίζει άμεσα με το κλικ του κουμπιού
     c1, c2 = st.columns(2)
     
-    if c1.button("💵 Μετρητά", use_container_width=True):
-        st.components.v1.html("""<script>new Audio("https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3").play();</script>""", height=0)
-        finalize(disc, "Μετρητά")
-        
-    if c2.button("💳 Κάρτα", use_container_width=True):
-        st.components.v1.html("""<script>new Audio("https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3").play();</script>""", height=0)
-        finalize(disc, "Κάρτα")
+    # Χρήση άμεσου HTML για την αναπαραγωγή ήχου
+    with c1:
+        if st.button("💵 Μετρητά", use_container_width=True):
+            st.markdown("""<audio autoplay><source src="https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3" type="audio/mpeg"></audio>""", unsafe_allow_html=True)
+            finalize(disc, "Μετρητά")
+    with c2:
+        if st.button("💳 Κάρτα", use_container_width=True):
+            st.markdown("""<audio autoplay><source src="https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3" type="audio/mpeg"></audio>""", unsafe_allow_html=True)
+            finalize(disc, "Κάρτα")
 
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
@@ -135,7 +132,7 @@ def finalize(disc_val, method):
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
         st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.2)
+        time.sleep(1.0)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -167,7 +164,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.11")
+    st.title("CHERRY 14.0.12")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -200,7 +197,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
                     else: 
-                        st.components.v1.html("""<script>new Audio("https://www.soundjay.com/buttons/beep-01a.mp3").play();</script>""", height=0)
+                        st.markdown("""<audio autoplay><source src="https://www.soundjay.com/buttons/beep-01a.mp3" type="audio/mpeg"></audio>""", unsafe_allow_html=True)
                         st.error("Barcode δεν βρέθηκε!")
                         st.session_state.bc_key += 1
             for idx, item in enumerate(st.session_state.cart):
