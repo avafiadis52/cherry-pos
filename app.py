@@ -48,19 +48,19 @@ def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def play_cash_sound():
-    # Ήχος κερμάτων / ταμείου
-    sound_html = """
-    <audio autoplay>
-      <source src="https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3" type="audio/mpeg">
-    </audio>
-    """
-    st.components.v1.html(sound_html, height=0)
+    # Ήχος κερμάτων (Cash Register)
+    st.components.v1.html("""
+        <audio autoplay>
+            <source src="https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3" type="audio/mpeg">
+        </audio>
+    """, height=0)
 
 def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
-    st.session_state.bc_key += 1; st.session_state.ph_key += 1
+    st.session_state.bc_key += 1
+    st.session_state.ph_key += 1
     st.rerun()
 
 @st.dialog("📦 ΕΛΕΥΘΕΡΟ ΕΙΔΟΣ (999)")
@@ -136,10 +136,10 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data: supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        # ΕΚΤΕΛΕΣΗ ΗΧΟΥ ΚΑΙ ΜΗΝΥΜΑΤΟΣ ΤΑΥΤΟΧΡΟΝΑ
+        # Ενεργοποίηση ήχου και μηνύματος
         play_cash_sound()
         st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.2) # Χρόνος για να ακουστεί ο ήχος πριν το reset
+        time.sleep(1.0)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -172,9 +172,11 @@ with st.sidebar:
     st.markdown(f"<div class='sidebar-date'>📅 {get_athens_now().strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
     st.title("CHERRY 14.0.9")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-    if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
+    
+    # ΔΙΟΡΘΩΜΕΝΗ ΕΞΟΔΟΣ ΜΕ JAVASCRIPT REFRESH
+    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
         st.session_state.clear()
-        st.rerun()
+        st.components.v1.html("<script>window.parent.location.reload();</script>", height=0)
 
 if view == "🛒 ΤΑΜΕΙΟ":
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
