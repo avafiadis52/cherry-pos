@@ -65,9 +65,16 @@ def trigger_alert_sound():
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
 def play_success_sound():
-    # Ήχος ολοκλήρωσης πληρωμής (Cash Register)
+    # Χρήση ενός πιο αξιόπιστου συνδέσμου για ήχο ταμειακής
     sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
-    st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
+    st.components.v1.html(f"""
+        <script>
+            var audio = new Audio("{sound_url}");
+            audio.play().catch(function(error) {{
+                console.log("Audio play failed:", error);
+            }});
+        </script>
+    """, height=0)
 
 def reset_app():
     st.session_state.cart = []
@@ -120,7 +127,11 @@ def finalize(disc_val, method):
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
+    
     try:
+        # Πρώτα παίζουμε τον ήχο για να προλάβει ο browser να τον εκτελέσει
+        play_success_sound()
+        
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
@@ -131,10 +142,8 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        # Ενεργοποίηση ήχου και εμφάνιση μηνύματος
-        play_success_sound()
         st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.0)
+        time.sleep(1.5) # Αυξήθηκε λίγο ο χρόνος για να ακουστεί ο ήχος
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -254,7 +263,4 @@ elif view == "👥 ΠΕΛΑΤΕΣ":
         cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
         if st.form_submit_button("ΠΡΟΣΘΗΚΗ"):
             if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-    res = supabase.table("customers").select("*").execute()
-    for row in res.data:
-        st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-        if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+    res = supabase.table
