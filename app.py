@@ -233,4 +233,4 @@ elif view == "👥 ΠΕΛΑΤΕΣ":
     res = supabase.table("customers").select("*").execute()
     for row in res.data:
         st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-        if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id
+        if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
