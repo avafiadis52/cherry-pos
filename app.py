@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.9", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.10", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -65,14 +65,12 @@ def trigger_alert_sound():
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
 def play_success_sound():
-    # Χρήση ενός πιο αξιόπιστου συνδέσμου για ήχο ταμειακής
+    # Ήχος Ταμειακής (Cash Register)
     sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
     st.components.v1.html(f"""
         <script>
             var audio = new Audio("{sound_url}");
-            audio.play().catch(function(error) {{
-                console.log("Audio play failed:", error);
-            }});
+            audio.play().catch(function(e) {{ console.log("Sound error:", e); }});
         </script>
     """, height=0)
 
@@ -119,8 +117,13 @@ def payment_popup():
     st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
     c1, c2 = st.columns(2)
-    if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
-    if c2.button("💳 Κάρτα", use_container_width=True): finalize(disc, "Κάρτα")
+    # Προσθήκη ήχου αμέσως στο κλικ
+    if c1.button("💵 Μετρητά", use_container_width=True): 
+        play_success_sound()
+        finalize(disc, "Μετρητά")
+    if c2.button("💳 Κάρτα", use_container_width=True): 
+        play_success_sound()
+        finalize(disc, "Κάρτα")
 
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
@@ -129,9 +132,6 @@ def finalize(disc_val, method):
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     
     try:
-        # Πρώτα παίζουμε τον ήχο για να προλάβει ο browser να τον εκτελέσει
-        play_success_sound()
-        
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
@@ -143,7 +143,7 @@ def finalize(disc_val, method):
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
         st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.5) # Αυξήθηκε λίγο ο χρόνος για να ακουστεί ο ήχος
+        time.sleep(1.2)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -158,16 +158,13 @@ def display_report(sales_df):
     df['ΠΕΛΑΤΗΣ'] = df['name'].fillna('Λιανική Πώληση')
     df['s_date_dt'] = pd.to_datetime(df['s_date'])
     df['day_str'] = df['s_date_dt'].dt.strftime('%Y-%m-%d')
-    
     df = df.sort_values('s_date', ascending=True)
     
     unique_trans = df.groupby(['day_str', 's_date']).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
     unique_trans['ΠΡΑΞΗ'] = unique_trans.groupby('day_str').cumcount() + 1
-    
     df = df.merge(unique_trans[['s_date', 'ΠΡΑΞΗ']], on='s_date')
 
-    m_df = unique_trans[unique_trans['method'] == 'Μετρητά']
-    k_df = unique_trans[unique_trans['method'] == 'Κάρτα']
+    m_df, k_df = unique_trans[unique_trans['method'] == 'Μετρητά'], unique_trans[unique_trans['method'] == 'Κάρτα']
     
     cols = st.columns(5)
     cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
@@ -184,9 +181,8 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.9")
+    st.title("CHERRY 14.0.10")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-    
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
         st.session_state.selected_cust_id = None
@@ -263,4 +259,7 @@ elif view == "👥 ΠΕΛΑΤΕΣ":
         cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
         if st.form_submit_button("ΠΡΟΣΘΗΚΗ"):
             if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-    res = supabase.table
+    res = supabase.table("customers").select("*").execute()
+    for row in res.data:
+        st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
+        if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
