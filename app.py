@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.25", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.19", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -43,7 +43,6 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'trigger_sound' not in st.session_state: st.session_state.trigger_sound = False
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -53,7 +52,6 @@ def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
-    st.session_state.trigger_sound = False
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.rerun()
@@ -74,8 +72,10 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        st.session_state.trigger_sound = True # Ενεργοποίηση ήχου
-        st.rerun()
+        st.balloons()
+        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(1.2)
+        reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 @st.dialog("💰 Πληρωμή")
@@ -130,27 +130,10 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.25")
+    st.title("CHERRY 14.0.19")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
 
 if view == "🛒 ΤΑΜΕΙΟ":
-    if st.session_state.trigger_sound:
-        # Ειδικό HTML για αναγκαστικό ήχο και μπαλόνια
-        sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
-        st.markdown(f"""
-            <audio id="cashAudio" autoplay>
-                <source src="{sound_url}" type="audio/mpeg">
-            </audio>
-            <script>
-                var audio = document.getElementById("cashAudio");
-                audio.play();
-            </script>
-            """, unsafe_allow_html=True)
-        st.balloons()
-        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(2)
-        reset_app()
-
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
     cl, cr = st.columns([1, 1.5])
     with cl:
