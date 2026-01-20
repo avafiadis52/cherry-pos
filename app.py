@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.18", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.19", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -32,7 +32,6 @@ st.markdown("""
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; margin: 10px 0; border: 2px solid #e44d26; padding: 10px; border-radius: 10px; background-color: #fff3f0; }
-    .success-banner { background-color: #2ecc71; color: white; padding: 20px; border-radius: 10px; text-align: center; font-size: 30px; font-weight: bold; margin: 20px 0; border: 2px solid #27ae60; }
     .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
@@ -49,7 +48,6 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'payment_done' not in st.session_state: st.session_state.payment_done = False
 
 if st.session_state.is_logged_out:
     st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>Έχετε αποσυνδεθεί επιτυχώς</h1>", unsafe_allow_html=True)
@@ -66,7 +64,6 @@ def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
-    st.session_state.payment_done = False
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.rerun()
@@ -124,8 +121,11 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
-        st.session_state.payment_done = True
-        st.rerun()
+        
+        st.balloons() # <--- Εδώ είναι τα μπαλόνια
+        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(1.2)
+        reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def display_report(sales_df):
@@ -156,7 +156,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.18")
+    st.title("CHERRY 14.0.19")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -165,11 +165,6 @@ with st.sidebar:
         st.rerun()
 
 if view == "🛒 ΤΑΜΕΙΟ":
-    if st.session_state.payment_done:
-        st.markdown("<div class='success-banner'>✅ Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!</div>", unsafe_allow_html=True)
-        time.sleep(1.2)
-        reset_app()
-    
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
     cl, cr = st.columns([1, 1.5])
     with cl:
