@@ -48,7 +48,7 @@ def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def play_cash_sound():
-    # Ενισχυμένος κώδικας για ήχο κερμάτων
+    # Ήχος κερμάτων / ταμείου
     sound_html = """
     <audio autoplay>
       <source src="https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3" type="audio/mpeg">
@@ -136,8 +136,11 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data: supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        play_cash_sound() # ΕΚΤΕΛΕΣΗ ΗΧΟΥ
-        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!"); time.sleep(1.0); reset_app()
+        # ΕΚΤΕΛΕΣΗ ΗΧΟΥ ΚΑΙ ΜΗΝΥΜΑΤΟΣ ΤΑΥΤΟΧΡΟΝΑ
+        play_cash_sound()
+        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(1.2) # Χρόνος για να ακουστεί ο ήχος πριν το reset
+        reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def display_report(sales_df):
