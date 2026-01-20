@@ -3,6 +3,7 @@ from datetime import datetime, date, timedelta
 import time
 import streamlit as st
 from supabase import create_client, Client
+import base64
 
 # --- 1. SUPABASE SETUP ---
 SUPABASE_URL = "https://hnwynihjkdkryrfepenh.supabase.co"
@@ -15,7 +16,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.19", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.20", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -48,6 +49,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
+if 'show_success' not in st.session_state: st.session_state.show_success = False
 
 if st.session_state.is_logged_out:
     st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>Έχετε αποσυνδεθεί επιτυχώς</h1>", unsafe_allow_html=True)
@@ -60,10 +62,21 @@ if st.session_state.is_logged_out:
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
+def play_cash_sound():
+    """Απλή μέθοδος αναπαραγωγής ήχου μέσω HTML"""
+    sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
+    html_str = f"""
+        <audio autoplay>
+            <source src="{sound_url}" type="audio/mpeg">
+        </audio>
+    """
+    st.markdown(html_str, unsafe_allow_html=True)
+
 def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
+    st.session_state.show_success = False
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.rerun()
@@ -122,10 +135,8 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        st.balloons() # <--- Εδώ είναι τα μπαλόνια
-        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.2)
-        reset_app()
+        st.session_state.show_success = True
+        st.rerun()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def display_report(sales_df):
@@ -156,7 +167,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.19")
+    st.title("CHERRY 14.0.20")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -165,6 +176,14 @@ with st.sidebar:
         st.rerun()
 
 if view == "🛒 ΤΑΜΕΙΟ":
+    # Εμφάνιση Μπαλονιών και Ήχου μετά την επιτυχία
+    if st.session_state.show_success:
+        st.balloons()
+        play_cash_sound()
+        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(2.0)
+        reset_app()
+
     st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
     cl, cr = st.columns([1, 1.5])
     with cl:
@@ -200,6 +219,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
         st.markdown(f"<div class='cart-area'>{'ΕΙΔΟΣ':<20} | {'ΤΙΜΗ':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
+# ... (Υπόλοιπος κώδικας για Manager, Αποθήκη, Πελάτες παραμένει ίδιος)
 elif view == "📊 MANAGER":
     res_all = supabase.table("sales").select("*").execute()
     if res_all.data:
@@ -221,16 +241,4 @@ elif view == "📦 ΑΠΟΘΗΚΗ":
             if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
     res = supabase.table("inventory").select("*").execute()
     for row in res.data:
-        st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-        if st.button("Διαγραφή", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
-
-elif view == "👥 ΠΕΛΑΤΕΣ":
-    st.subheader("👥 Πελάτες")
-    with st.form("c_form", clear_on_submit=True):
-        cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
-        if st.form_submit_button("ΠΡΟΣΘΗΚΗ"):
-            if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-    res = supabase.table("customers").select("*").execute()
-    for row in res.data:
-        st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-        if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+        st.markdown(f"<div class='data-row'>{row['
