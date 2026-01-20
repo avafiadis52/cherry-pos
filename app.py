@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.1.1", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.1.2", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -75,36 +75,56 @@ def reset_app():
 @st.dialog("📦 ΕΛΕΥΘΕΡΟ ΕΙΔΟΣ (999)")
 def manual_item_popup():
     st.write("Πείτε π.χ.: 'Κούρεμα και δέκα ευρώ'")
-    # Φωνητικό Script
+    
     st.components.v1.html("""
     <script>
     const recognition = new (window.webkitSpeechRecognition || window.Recognition)();
     recognition.lang = 'el-GR';
-    function startRec() { recognition.start(); }
+    
+    function startRec() { 
+        recognition.start(); 
+    }
+
     recognition.onresult = function(event) {
         const result = event.results[0][0].transcript;
         const parent = window.parent.document;
+        
         let parts = result.split(" και ");
         let name = parts[0] || "";
         let priceStr = parts[1] || "";
         let price = priceStr.replace(/[^0-9,.]/g, '').replace(',', '.');
+        
+        // Στόχευση των εισαγωγών του Streamlit
         const inputs = parent.querySelectorAll('input');
         inputs.forEach(input => {
-            if (input.ariaLabel === "Όνομα Είδους") input.value = name;
-            if (input.type === "number") input.value = price;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+            // Το όνομα είδους συνήθως είναι το πρώτο text input
+            if (input.type === "text" && input.ariaLabel !== "Σάρωση Barcode") {
+                input.value = name;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            // Η τιμή είναι το number input
+            if (input.type === "number") {
+                input.value = price;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         });
     };
     </script>
-    <button onclick="startRec()" style="width:100%; height:45px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:10px;">🎤 ΦΩΝΗΤΙΚΗ ΚΑΤΑΧΩΡΗΣΗ</button>
-    """, height=60)
+    <button onclick="startRec()" style="width:100%; height:45px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:15px;">🎤 ΦΩΝΗΤΙΚΗ ΚΑΤΑΧΩΡΗΣΗ</button>
+    """, height=70)
 
-    m_name = st.text_input("Όνομα Είδους")
-    m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1)
+    m_name = st.text_input("Όνομα Είδους", key="manual_name")
+    m_price = st.number_input("Τιμή (€)", min_value=0.0, format="%.2f", step=0.1, key="manual_price")
+    
     if st.button("ΠΡΟΣΘΗΚΗ", use_container_width=True):
-        if m_name:
+        if m_name and m_price > 0:
             st.session_state.cart.append({'bc': '999', 'name': m_name, 'price': round(float(m_price), 2)})
-            st.session_state.bc_key += 1; st.rerun()
+            st.session_state.bc_key += 1
+            st.rerun()
+        else:
+            st.error("Παρακαλώ συμπληρώστε Όνομα και Τιμή")
 
 @st.dialog("👤 ΝΕΟΣ ΠΕΛΑΤΗΣ")
 def new_customer_popup(phone=""):
@@ -182,7 +202,7 @@ def display_report(sales_df):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.1.1")
+    st.title("CHERRY 14.1.2")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.is_logged_out = True
