@@ -15,17 +15,18 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.1.9", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.2.0", layout="wide", page_icon="🍒")
 
+# Logout Handling - Καθαρίζει τα πάντα από την οθόνη
 if st.session_state.get('is_logged_out', False):
     st.markdown("""
         <style>
-            [data-testid="stSidebar"] {display: none;}
+            [data-testid="stSidebar"], .stAppHeader {display: none;}
             .stApp {background-color: #1a1a1a;}
         </style>
         <div style='text-align: center; padding-top: 150px;'>
             <h1 style='color: #e74c3c; font-size: 50px;'>🔒 Η ΕΦΑΡΜΟΓΗ ΕΚΛΕΙΣΕ</h1>
-            <p style='color: white;'>Όλα τα δεδομένα καθαρίστηκαν.</p>
+            <p style='color: white; font-size: 20px;'>Όλα τα προσωρινά δεδομένα καθαρίστηκαν με ασφάλεια.</p>
         </div>
     """, unsafe_allow_html=True)
     if st.button("🔄 ΕΠΑΝΕΚΚΙΝΗΣΗ"):
@@ -38,14 +39,16 @@ st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
-    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p, div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p { color: #111111 !important; }
+    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p { color: #111111 !important; }
     input { color: #000000 !important; }
-    .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
+    .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; border: 1px solid #3b3b3b; min-height: 200px; color: #2ecc71; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
-    .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
-    .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; margin: 10px 0; border: 2px solid #e44d26; padding: 10px; border-radius: 10px; background-color: #fff3f0; }
-    div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
-    .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; text-align: left; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+    .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
+    .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
+    .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; }
+    div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
+    .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -61,7 +64,6 @@ def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def play_cash_sound():
-    # Ήχος κερμάτων / ταμείου
     sound_url = "https://www.soundjay.com/misc/sounds/cash-register-purchase-1.mp3"
     st.components.v1.html(f"""<script>var audio = new Audio("{sound_url}"); audio.play();</script>""", height=0)
 
@@ -85,32 +87,11 @@ def manual_item_popup():
         let parts = text.split(" και ");
         let name = parts[0] || "";
         let price = (parts[1] || "").replace(/[^0-9,.]/g, '').replace(',', '.');
-        
         const inputs = parent.querySelectorAll('input');
-        let nameInp, priceInp;
         inputs.forEach(input => {
-            if (input.ariaLabel === "Όνομα Είδους") nameInp = input;
-            if (input.type === "number") priceInp = input;
+            if (input.ariaLabel === "Όνομα Είδους") { input.value = name; input.dispatchEvent(new Event('input', { bubbles: true })); }
+            if (input.type === "number") { input.value = price; input.dispatchEvent(new Event('input', { bubbles: true })); }
         });
-
-        if (nameInp && priceInp) {
-            // Virtual Typing για να το "νιώσει" το Streamlit
-            nameInp.value = name;
-            nameInp.dispatchEvent(new Event('input', { bubbles: true }));
-            nameInp.dispatchEvent(new Event('change', { bubbles: true }));
-            
-            priceInp.value = price;
-            priceInp.dispatchEvent(new Event('input', { bubbles: true }));
-            priceInp.dispatchEvent(new Event('change', { bubbles: true }));
-            
-            // Κλικ στο κουμπί μετά από λίγο
-            setTimeout(() => {
-                const buttons = parent.querySelectorAll('button');
-                buttons.forEach(btn => {
-                    if (btn.innerText.includes("ΠΡΟΣΘΗΚΗ")) btn.click();
-                });
-            }, 600);
-        }
     };
     </script>
     <button onclick="recognition.start()" style="width:100%; height:45px; border-radius:10px; background:#e74c3c; color:white; font-weight:bold; cursor:pointer; border:none; margin-bottom:10px;">🎤 ΦΩΝΗΤΙΚΗ ΕΝΤΟΛΗ</button>
@@ -158,24 +139,40 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data: supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        # 1. ΠΑΙΖΕΙ ΤΟΝ ΗΧΟ
         play_cash_sound()
-        st.success("ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.0) # Λίγος χρόνος να ακουστεί ο ήχος
+        st.success("Η ΠΛΗΡΩΜΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(1.0)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
-# (Υπόλοιπο UI - Manager, Αποθήκη, κλπ παραμένουν ίδια)
+def display_report(sales_df):
+    if sales_df.empty:
+        st.info("Δεν υπάρχουν πωλήσεις."); return
+    # Fetch customer names for display
+    cust_res = supabase.table("customers").select("id, name").execute()
+    cust_dict = {c['id']: c['name'] for c in cust_res.data} if cust_res.data else {}
+    
+    sales_df['ΠΕΛΑΤΗΣ'] = sales_df['cust_id'].map(cust_dict).fillna('Λιανική Πώληση')
+    m_df = sales_df[sales_df['method'] == 'Μετρητά']
+    k_df = sales_df[sales_df['method'] == 'Κάρτα']
+    
+    cols = st.columns(3)
+    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>💵 ΜΕΤΡΗΤΑ</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>💳 ΚΑΡΤΑ</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>✅ ΣΥΝΟΛΟ</p><p class='stat-val'>{sales_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    
+    st.dataframe(sales_df[['s_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+# --- 4. MAIN UI ---
 with st.sidebar:
-    st.markdown(f"<div class='sidebar-date'>📅 {get_athens_now().strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.1.9")
+    st.title("🍒 CHERRY v14.2.0")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-    if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
+    st.write("---")
+    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
         st.session_state.is_logged_out = True
         st.rerun()
 
 if view == "🛒 ΤΑΜΕΙΟ":
-    st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
     cl, cr = st.columns([1, 1.5])
     with cl:
         if st.session_state.selected_cust_id is None:
@@ -185,8 +182,8 @@ if view == "🛒 ΤΑΜΕΙΟ":
                 if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
             if st.button("🛒 ΛΙΑΝΙΚΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
         else:
-            st.button(f"👤 {st.session_state.cust_name}", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
-            bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+            st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+            bc = st.text_input("Σάρωση Barcode", key=f"bc_{st.session_state.bc_key}")
             if bc:
                 if bc.strip() == "999": manual_item_popup()
                 else:
@@ -195,12 +192,32 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         item = res.data[0]
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
-                    else: st.error("Σφάλμα!"); st.session_state.bc_key += 1
+                    else: st.error("Barcode δεν βρέθηκε!"); st.session_state.bc_key += 1
             if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
-        if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+            if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
     with cr:
         total = sum(i['price'] for i in st.session_state.cart)
-        st.markdown(f"<div class='cart-area'>{[i['name'] + ' | ' + str(i['price']) + '€' for i in st.session_state.cart]}</div>", unsafe_allow_html=True)
+        cart_text = "\n".join([f"{i['name']} - {i['price']}€" for i in st.session_state.cart])
+        st.markdown(f"<div class='cart-area'>{cart_text if cart_text else 'Το καλάθι είναι άδειο'}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
-# (Προσθήκη Manager, Αποθήκη αν χρειαστεί - Ο κώδικας v14.0.9 παραμένει ενεργός)
+elif view == "📊 MANAGER":
+    st.subheader("📊 ΙΣΤΟΡΙΚΟ ΠΩΛΗΣΕΩΝ")
+    res = supabase.table("sales").select("*").execute()
+    if res.data:
+        df = pd.DataFrame(res.data)
+        display_report(df)
+
+elif view == "📦 ΑΠΟΘΗΚΗ":
+    st.subheader("📦 ΑΠΟΘΕΜΑ")
+    res = supabase.table("inventory").select("*").execute()
+    if res.data:
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
+
+elif view == "👥 ΠΕΛΑΤΕΣ":
+    st.subheader("👥 ΛΙΣΤΑ ΠΕΛΑΤΩΝ")
+    res = supabase.table("customers").select("*").execute()
+    if res.data:
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
