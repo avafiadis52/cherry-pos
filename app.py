@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.57", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -162,7 +162,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.55")
+        st.title("CHERRY 14.0.57")
         view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
             st.session_state.cart = []
@@ -220,7 +220,6 @@ else:
         if res_all.data:
             full_df = pd.DataFrame(res_all.data)
             full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
-            # Εδώ έγινε η αλλαγή για πιο έντονα Tabs με χρήση emoji και κεφαλαίων
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📜 ΙΣΤΟΡΙΚΟ"])
             with t1: display_report(full_df[full_df['s_date_dt'].dt.date == get_athens_now().date()])
             with t2:
@@ -238,7 +237,8 @@ else:
         res = supabase.table("inventory").select("*").execute()
         for row in res.data:
             st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-            if st.button("ΔΙΑΓΡΑΦΗ", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
+            if st.button("ΔΙΑΓΡΑΦΗ", key=f"inv_{row['barcode']}"):
+                supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
 
     elif view == "👥 ΠΕΛΑΤΕΣ":
         st.subheader("Πελατολόγιο")
@@ -248,5 +248,4 @@ else:
                 if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
         res = supabase.table("customers").select("*").execute()
         for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("ΔΙΑΓΡΑΦΗ", key=f"
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞
