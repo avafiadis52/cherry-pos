@@ -62,11 +62,14 @@ def reset_app():
     st.rerun()
 
 def play_sound(url):
-    st.markdown(f"""
-        <audio autoplay>
+    st.components.v1.html(
+        f"""
+        <audio autoplay style="display:none">
             <source src="{url}" type="audio/mpeg">
         </audio>
-    """, unsafe_allow_html=True)
+        """,
+        height=0,
+    )
 
 @st.dialog("📦 Ελεύθερο Είδος (999)")
 def manual_item_popup():
@@ -122,10 +125,13 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3") # Ήχος επιτυχίας
-        st.balloons() 
+        # Εμφάνιση μπαλονιών και αναπαραγωγή ήχου
+        st.balloons()
+        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
-        time.sleep(1.5)
+        
+        # Μικρή καθυστέρηση για να ακουστεί ο ήχος πριν το reset
+        time.sleep(2.0)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -197,7 +203,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
                     else: 
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3") # Ήχος σφάλματος
+                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                         st.error("Barcode δεν βρέθηκε!")
             for idx, item in enumerate(st.session_state.cart):
                 if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
