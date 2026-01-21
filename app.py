@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.32", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.33", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -167,7 +167,7 @@ if st.session_state.is_logged_out:
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.32")
+    st.title("CHERRY 14.0.33")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -203,13 +203,17 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                         st.error("Barcode δεν βρέθηκε!")
             
-            # Λίστα καλαθιού με ήχο αφαίρεσης
+            # --- ΔΙΟΡΘΩΜΕΝΗ ΛΙΣΤΑ ΑΦΑΙΡΕΣΗΣ ΜΕ ΗΧΟ ---
             for idx, item in enumerate(st.session_state.cart):
-                if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
-                    play_sound("https://www.soundjay.com/buttons/button-50.mp3") # Click sound
+                # Χρήση 2 columns για να έχουμε το κουμπί καθαρό
+                col_btn, col_info = st.columns([0.2, 0.8])
+                if col_btn.button("❌", key=f"del_{idx}"):
+                    # Παίζει τον ήχο ακαριαία μέσω components πριν το pop
+                    st.components.v1.html(f"""<audio autoplay><source src="https://www.soundjay.com/buttons/button-50.mp3" type="audio/mpeg"></audio>""", height=0)
                     st.session_state.cart.pop(idx)
-                    time.sleep(0.1) # Μικρή καθυστέρηση για τον ήχο
+                    time.sleep(0.1) # Δίνει χρόνο στον browser να ξεκινήσει το audio context
                     st.rerun()
+                col_info.write(f"{item['name']} ({item['price']}€)")
             
             if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
         if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
@@ -219,6 +223,7 @@ if view == "🛒 ΤΑΜΕΙΟ":
         st.markdown(f"<div class='cart-area'>{'ΕΙΔΟΣ':<20} | {'ΤΙΜΗ':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
+# Οι υπόλοιπες ενότητες (MANAGER, ΑΠΟΘΗΚΗ, ΠΕΛΑΤΕΣ) παραμένουν ίδιες με την v14.0.19
 elif view == "📊 MANAGER":
     res_all = supabase.table("sales").select("*").execute()
     if res_all.data:
