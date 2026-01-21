@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.39", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.41", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -167,7 +167,7 @@ if st.session_state.is_logged_out:
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.39")
+    st.title("CHERRY 14.0.41")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -189,75 +189,4 @@ if view == "🛒 ΤΑΜΕΙΟ":
                 else: new_customer_popup(ph.strip())
             if st.button("🛒 ΛΙΑΝΙΚΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
         else:
-            st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
-            bc = st.text_input("Σάρωση Barcode", key=f"bc_{st.session_state.bc_key}")
-            if bc:
-                if bc.strip() == "999": manual_item_popup()
-                else:
-                    res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
-                    if res.data:
-                        item = res.data[0]
-                        st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                        st.session_state.bc_key += 1; st.rerun()
-                    else: 
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                        st.error("Barcode δεν βρέθηκε!")
-            
-            # --- ΙΔΙΑ ΤΕΧΝΙΚΗ ΜΕ ΤΟ ERROR ---
-            for idx, item in enumerate(st.session_state.cart):
-                if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
-                    # Παίζουμε τον ήχο
-                    play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                    # Αφαιρούμε το αντικείμενο
-                    st.session_state.cart.pop(idx)
-                    # Εμφανίζουμε το error (ίδια τεχνική με barcode error)
-                    st.error(f"Αφαιρέθηκε: {item['name']}")
-                    # Περιμένουμε για τον ήχο
-                    time.sleep(0.5)
-                    st.rerun()
-            
-            if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
-        if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
-    with cr:
-        total = sum(i['price'] for i in st.session_state.cart)
-        lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
-        st.markdown(f"<div class='cart-area'>{'ΕΙΔΟΣ':<20} | {'ΤΙΜΗ':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
-
-# Οι υπόλοιπες ενότητες παραμένουν ίδιες...
-elif view == "📊 MANAGER":
-    res_all = supabase.table("sales").select("*").execute()
-    if res_all.data:
-        full_df = pd.DataFrame(res_all.data)
-        full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
-        t1, t2 = st.tabs(["ΣΗΜΕΡΑ", "ΙΣΤΟΡΙΚΟ"])
-        with t1: display_report(full_df[full_df['s_date_dt'].dt.date == get_athens_now().date()])
-        with t2:
-            c1, c2 = st.columns(2)
-            d_s, d_e = c1.date_input("Από:", get_athens_now().date() - timedelta(days=7)), c2.date_input("Έως:", get_athens_now().date())
-            display_report(full_df[(full_df['s_date_dt'].dt.date >= d_s) & (full_df['s_date_dt'].dt.date <= d_e)])
-
-elif view == "📦 ΑΠΟΘΗΚΗ":
-    st.subheader("📦 Αποθήκη")
-    with st.form("inv_form", clear_on_submit=True):
-        c1, c2, c3, c4 = st.columns(4)
-        b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.1), c4.number_input("Stock", step=1)
-        if st.form_submit_button("ΑΠΟΘΗΚΕΥΣΗ"):
-            if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-    res = supabase.table("inventory").select("*").execute()
-    if res.data:
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
-
-elif view == "👥 ΠΕΛΑΤΕΣ":
-    st.subheader("👥 Πελάτες")
-    with st.form("c_form", clear_on_submit=True):
-        cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
-        if st.form_submit_button("ΠΡΟΣΘΗΚΗ"):
-            if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-    res = supabase.table("customers").select("*").execute()
-    if res.data:
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+            st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώλη
