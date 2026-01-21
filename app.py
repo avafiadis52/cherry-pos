@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.49", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.50", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -59,7 +59,7 @@ def play_sound(url):
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone=""):
-    st.write(f"📞 Τηλέφωνο: {phone}")
+    st.write(f"📞 Νέο Τηλέφωνο: {phone}")
     name = st.text_input("Ονοματεπώνυμο Πελάτη")
     if st.button("Αποθήκευση & Επιλογή", use_container_width=True):
         if name:
@@ -67,7 +67,7 @@ def new_customer_popup(phone=""):
             if res.data:
                 st.session_state.selected_cust_id = res.data[0]['id']
                 st.session_state.cust_name = res.data[0]['name']
-                st.success("Ο πελάτης αποθηκεύτηκε!")
+                st.success("Επιτυχής εγγραφή!")
                 time.sleep(0.5)
                 st.rerun()
 
@@ -97,13 +97,14 @@ def finalize(method):
     except Exception as e:
         st.error(f"Σφάλμα: {e}")
 
-# --- 4. MAIN UI ---
+# --- 4. MAIN LOGIC ---
 if st.session_state.is_logged_out:
-    st.warning("Είστε αποσυνδεδεμένοι από το σύστημα.")
+    st.warning("Είστε αποσυνδεδεμένοι.")
     if st.button("Είσοδος"):
         st.session_state.is_logged_out = False
         st.rerun()
 else:
+    # Εδώ ξεκινάει το κύριο σώμα της εφαρμογής (σωστά indented)
     with st.sidebar:
         st.title("🍒 CHERRY POS")
         st.write(get_athens_now().strftime("%d/%m/%Y %H:%M"))
@@ -118,7 +119,7 @@ else:
         
         with cl:
             if st.session_state.selected_cust_id is None:
-                # Τηλέφωνο με 10 παύλες στο Placeholder
+                # Πεδίο Τηλεφώνου με Placeholder 10 παύλες
                 ph_input = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_in_{st.session_state.ph_key}")
                 
                 if ph_input:
