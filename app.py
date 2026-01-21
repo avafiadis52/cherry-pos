@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.48", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.49", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -99,88 +99,85 @@ def finalize(method):
 
 # --- 4. MAIN UI ---
 if st.session_state.is_logged_out:
-    st.info("Είστε αποσυνδεδεμένοι.")
-    if st.button("Είσοδος στην Εφαρμογή"):
+    st.warning("Είστε αποσυνδεδεμένοι από το σύστημα.")
+    if st.button("Είσοδος"):
         st.session_state.is_logged_out = False
         st.rerun()
-    st.stop()
+else:
+    with st.sidebar:
+        st.title("🍒 CHERRY POS")
+        st.write(get_athens_now().strftime("%d/%m/%Y %H:%M"))
+        view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "👥 ΠΕΛΑΤΕΣ"])
+        if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
+            st.session_state.is_logged_out = True
+            st.rerun()
 
-with st.sidebar:
-    st.title("🍒 CHERRY POS")
-    st.write(get_athens_now().strftime("%d/%m/%Y %H:%M"))
-    view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "👥 ΠΕΛΑΤΕΣ"])
-    if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True):
-        st.session_state.is_logged_out = True
-        st.rerun()
+    if view == "🛒 ΤΑΜΕΙΟ":
+        st.markdown(f"<div class='status-header'>ΠΕΛΑΤΗΣ: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+        cl, cr = st.columns([1, 1.5])
+        
+        with cl:
+            if st.session_state.selected_cust_id is None:
+                # Τηλέφωνο με 10 παύλες στο Placeholder
+                ph_input = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_in_{st.session_state.ph_key}")
+                
+                if ph_input:
+                    clean_phone = "".join([c for c in ph_input if c.isdigit()])
+                    if len(clean_phone) == 10:
+                        res = supabase.table("customers").select("*").eq("phone", clean_phone).execute()
+                        if res.data: 
+                            st.session_state.selected_cust_id = res.data[0]['id']
+                            st.session_state.cust_name = res.data[0]['name']
+                            st.rerun()
+                        else:
+                            new_customer_popup(clean_phone)
+                    else:
+                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+                        st.error("⚠️ Απαιτούνται ακριβώς 10 ψηφία!")
+                
+                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True):
+                    st.session_state.selected_cust_id = 0
+                    st.rerun()
+            else:
+                if st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", use_container_width=True):
+                    st.session_state.selected_cust_id = None
+                    st.session_state.cust_name = "Λιανική Πώληση"
+                    st.rerun()
 
-if view == "🛒 ΤΑΜΕΙΟ":
-    st.markdown(f"<div class='status-header'>ΠΕΛΑΤΗΣ: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
-    cl, cr = st.columns([1, 1.5])
-    
-    with cl:
-        if st.session_state.selected_cust_id is None:
-            # ΤΗΛΕΦΩΝΟ ΜΕ PLACEHOLDER 10 ΠΑΥΛΕΣ
-            ph_input = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_in_{st.session_state.ph_key}")
-            
-            if ph_input:
-                clean_phone = "".join([c for c in ph_input if c.isdigit()])
-                # Έλεγχος αν είναι ακριβώς 10 ψηφία
-                if len(clean_phone) == 10:
-                    res = supabase.table("customers").select("*").eq("phone", clean_phone).execute()
-                    if res.data: 
-                        st.session_state.selected_cust_id = res.data[0]['id']
-                        st.session_state.cust_name = res.data[0]['name']
+                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+                if bc:
+                    res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
+                    if res.data:
+                        st.session_state.cart.append({
+                            'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])
+                        })
+                        st.session_state.bc_key += 1
                         st.rerun()
                     else:
-                        new_customer_popup(clean_phone)
-                else:
-                    # ΑΝ ΔΕΝ ΕΙΝΑΙ 10, ΜΠΙΠ ΚΑΙ ΜΗΝΥΜΑ
-                    play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                    st.error("⚠️ Σφάλμα: Απαιτούνται 10 ψηφία.")
+                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+                        st.error("Το προϊόν δεν βρέθηκε!")
+
+                if st.session_state.cart:
+                    if st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True):
+                        payment_popup()
+                
+                if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True):
+                    reset_app()
+
+        with cr:
+            total = sum(i['price'] for i in st.session_state.cart)
+            cart_display = "\n".join([f"{i['name'][:20]:<20} | {i['price']:>7.2f}€" for i in st.session_state.cart])
+            if not cart_display: cart_display = "Το καλάθι είναι άδειο..."
             
-            if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True):
-                st.session_state.selected_cust_id = 0
-                st.rerun()
-        else:
-            if st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", use_container_width=True):
-                st.session_state.selected_cust_id = None
-                st.session_state.cust_name = "Λιανική Πώληση"
-                st.rerun()
+            st.markdown(f"<div class='cart-area'>{cart_display}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
-            bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
-            if bc:
-                res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
-                if res.data:
-                    st.session_state.cart.append({
-                        'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])
-                    })
-                    st.session_state.bc_key += 1
-                    st.rerun()
-                else:
-                    play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                    st.error("Το προϊόν δεν βρέθηκε!")
+    elif view == "📊 MANAGER":
+        st.header("Ιστορικό Πωλήσεων")
+        res = supabase.table("sales").select("*").order("s_date", desc=True).execute()
+        if res.data: st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-            if st.session_state.cart:
-                if st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True):
-                    payment_popup()
-            
-            if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True):
-                reset_app()
-
-    with cr:
-        total = sum(i['price'] for i in st.session_state.cart)
-        cart_display = "\n".join([f"{i['name'][:20]:<20} | {i['price']:>7.2f}€" for i in st.session_state.cart])
-        if not cart_display: cart_display = "Το καλάθι είναι άδειο..."
-        
-        st.markdown(f"<div class='cart-area'>{cart_display}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
-
-elif view == "📊 MANAGER":
-    st.header("Ιστορικό Πωλήσεων")
-    res = supabase.table("sales").select("*").order("s_date", desc=True).execute()
-    if res.data: st.dataframe(pd.DataFrame(res.data), use_container_width=True)
-
-elif view == "👥 ΠΕΛΑΤΕΣ":
-    st.header("Πελάτες")
-    res = supabase.table("customers").select("*").execute()
-    if res.data: st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+    elif view == "👥 ΠΕΛΑΤΕΣ":
+        st.header("Πελάτες")
+        res = supabase.table("customers").select("*").execute()
+        if res.data: st.dataframe(pd.DataFrame(res.data), use_container_width=True)
