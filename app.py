@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.42", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.43", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -62,14 +62,21 @@ def reset_app():
     st.rerun()
 
 def play_sound(url):
-    st.components.v1.html(
-        f"""
-        <audio autoplay style="display:none">
-            <source src="{url}" type="audio/mpeg">
-        </audio>
-        """,
-        height=0,
-    )
+    # Χρησιμοποιούμε st.empty για να διασφαλίσουμε ότι το HTML τοποθετείται σωστά
+    placeholder = st.empty()
+    with placeholder:
+        st.components.v1.html(
+            f"""
+            <audio autoplay>
+                <source src="{url}" type="audio/mpeg">
+            </audio>
+            <script>
+                // Μικρή καθυστέρηση για να βεβαιωθούμε ότι ο browser "είδε" το audio tag
+                console.log("Playing sound: {url}");
+            </script>
+            """,
+            height=0,
+        )
 
 @st.dialog("📦 Ελεύθερο Είδος (999)")
 def manual_item_popup():
@@ -167,7 +174,7 @@ if st.session_state.get('is_logged_out', False):
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>📅 {now.strftime('%d/%m/%Y')}<br>🕒 {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    st.title("CHERRY 14.0.42")
+    st.title("CHERRY 14.0.43")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
     if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
         st.session_state.cart = []
@@ -203,12 +210,17 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                         st.error("Barcode δεν βρέθηκε!")
             
+            # --- ΒΕΛΤΙΩΜΕΝΗ ΔΙΑΓΡΑΦΗ ΜΕ ΣΙΓΟΥΡΟ ΗΧΟ ---
             for idx, item in enumerate(st.session_state.cart):
                 if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
+                    # 1. Παίζουμε τον ήχο πρώτα
                     play_sound("https://www.soundjay.com/buttons/button-20.mp3")
-                    st.session_state.cart.pop(idx)
+                    # 2. Εμφανίζουμε το μήνυμα
                     st.error(f"Αφαιρέθηκε: {item['name']}")
-                    time.sleep(0.5)
+                    # 3. Αφαιρούμε από το cart
+                    st.session_state.cart.pop(idx)
+                    # 4. Αυξάνουμε την αναμονή στο 0.7 για να προλάβει ο browser
+                    time.sleep(0.7)
                     st.rerun()
             
             if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
@@ -236,22 +248,4 @@ elif view == "📦 ΑΠΟΘΗΚΗ":
     with st.form("inv_form", clear_on_submit=True):
         c1, c2, c3, c4 = st.columns(4)
         b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.1), c4.number_input("Stock", step=1)
-        if st.form_submit_button("ΑΠΟΘΗΚΕΥΣΗ"):
-            if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-    res = supabase.table("inventory").select("*").execute()
-    if res.data:
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
-
-elif view == "👥 ΠΕΛΑΤΕΣ":
-    st.subheader("👥 Πελάτες")
-    with st.form("c_form", clear_on_submit=True):
-        cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
-        if st.form_submit_button("ΠΡΟΣΘΗΚΗ"):
-            if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-    res = supabase.table("customers").select("*").execute()
-    if res.data:
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+        if st.form_
