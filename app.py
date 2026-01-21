@@ -68,6 +68,14 @@ def reset_app():
     st.session_state.ph_key += 1
     st.rerun()
 
+def play_error_beep():
+    # Παίζει έναν ήχο "Error" μέσω JavaScript
+    st.markdown("""
+        <audio autoplay>
+            <source src="https://www.soundjay.com/buttons/beep-10.mp3" type="audio/mpeg">
+        </audio>
+    """, unsafe_allow_html=True)
+
 @st.dialog("📦 Ελεύθερο Είδος (999)")
 def manual_item_popup():
     m_name = st.text_input("Όνομα Είδους")
@@ -188,7 +196,9 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         item = res.data[0]
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
-                    else: st.error("Barcode δεν βρέθηκε!")
+                    else: 
+                        play_error_beep() # <-- ΗΧΟΣ ΜΠΙΠ ΕΔΩ
+                        st.error("Barcode δεν βρέθηκε!")
             for idx, item in enumerate(st.session_state.cart):
                 if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
                     st.session_state.cart.pop(idx); st.rerun()
