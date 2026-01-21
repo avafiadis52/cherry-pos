@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.30", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.31", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -81,7 +81,7 @@ def finalize(disc, method):
 
 # --- 4. MAIN UI ---
 with st.sidebar:
-    st.title("CHERRY 14.0.30")
+    st.title("CHERRY 14.0.31")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
 
 if view == "🛒 ΤΑΜΕΙΟ":
@@ -117,15 +117,43 @@ if view == "🛒 ΤΑΜΕΙΟ":
         total = sum(i['price'] for i in st.session_state.cart)
         st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
         
-        # Λίστα καλαθιού με ήχο αφαίρεσης
         for idx, item in enumerate(st.session_state.cart):
             col_a, col_b = st.columns([4, 1])
             col_a.markdown(f"<div class='data-row'>{item['name']} - {item['price']}€</div>", unsafe_allow_html=True)
             if col_b.button("❌", key=f"del_{idx}"):
-                # Ήχος αφαίρεσης
-                play_sound("https://www.soundjay.com/buttons/button-50.mp3")
+                play_sound("https://www.soundjay.com/buttons/button-50.mp3") # Ήχος αφαίρεσης
                 st.session_state.cart.pop(idx)
-                time.sleep(0.1) # Μικρή καθυστέρηση για να προλάβει να ακουστεί
+                time.sleep(0.1)
                 st.rerun()
 
-# (MANAGER, ΑΠΟΘΗΚΗ κτλ παραμένουν ως είχαν στην 14.0.19)
+# --- MANAGER VIEW ---
+elif view == "📊 MANAGER":
+    st.title("Manager Dashboard")
+    today = get_athens_now().date()
+    start_dt = datetime.combine(today, datetime.min.time()).strftime("%Y-%m-%d %H:%M:%S")
+    res = supabase.table("sales").select("*").gte("s_date", start_dt).execute()
+    if res.data:
+        df = pd.DataFrame(res.data)
+        st.metric("Σημερινά Έσοδα", f"{df['final_item_price'].sum():.2f}€")
+        st.dataframe(df)
+    else: st.info("Δεν υπάρχουν σημερινές πωλήσεις.")
+
+# --- ΑΠΟΘΗΚΗ VIEW ---
+elif view == "📦 ΑΠΟΘΗΚΗ":
+    st.title("📦 Διαχείριση Αποθήκης")
+    with st.expander("➕ Προσθήκη Νέου Είδους"):
+        new_bc = st.text_input("Barcode")
+        new_name = st.text_input("Όνομα Είδους")
+        new_price = st.number_input("Τιμή", min_value=0.0, format="%.2f")
+        if st.button("Αποθήκευση"):
+            supabase.table("inventory").insert({"barcode": new_bc, "name": new_name, "price": new_price}).execute()
+            st.success("Το είδος προστέθηκε!"); st.rerun()
+    
+    res = supabase.table("inventory").select("*").execute()
+    if res.data: st.dataframe(pd.DataFrame(res.data))
+
+# --- ΠΕΛΑΤΕΣ VIEW ---
+elif view == "👥 ΠΕΛΑΤΕΣ":
+    st.title("👥 Πελατολόγιο")
+    res = supabase.table("customers").select("*").execute()
+    if res.data: st.dataframe(pd.DataFrame(res.data))
