@@ -62,8 +62,7 @@ def new_customer_popup(phone=""):
     if st.button("Αποθήκευση", use_container_width=True):
         res = supabase.table("customers").insert({"name": name, "phone": phone}).execute()
         if res.data:
-            st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
-            @st.dialog("💰 Πληρωμή")
+@st.dialog("💰 Πληρωμή")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
     st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
@@ -151,3 +150,4 @@ elif view == "👥 ΠΕΛΑΤΕΣ":
     st.subheader("Πελατολόγιο")
     res = supabase.table("customers").select("*").execute()
     if res.data: st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+            st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
