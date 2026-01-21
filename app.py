@@ -15,23 +15,40 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.27", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.28", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: bold !important; }
-    input { color: #000000 !important; font-size: 20px !important; }
-    .total-label { font-size: 75px; font-weight: bold; color: #2ecc71; text-align: center; }
+    input { color: #000000 !important; font-size: 20px !important; border-radius: 10px !important; }
+    .total-label { font-size: 80px; font-weight: bold; color: #2ecc71; text-align: center; margin: 10px 0; }
     div.stButton > button { 
         background-color: #f1c40f !important; 
         color: black !important; 
         border-radius: 15px !important; 
         font-weight: bold !important; 
-        height: 65px !important;
+        height: 70px !important;
         width: 100% !important;
+        font-size: 20px !important;
     }
+    .stSuccess, .stError { font-size: 20px !important; font-weight: bold !important; }
     </style>
+    
+    <script>
+    // Bridge για το iOS: Κρατάει το AudioContext ζωντανό
+    var audioCtx = null;
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+    document.addEventListener('click', initAudio);
+    document.addEventListener('touchstart', initAudio);
+    </script>
     """, unsafe_allow_html=True)
 
 # Session States
@@ -43,20 +60,19 @@ if 'audio_unlocked' not in st.session_state: st.session_state.audio_unlocked = F
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
-def force_play_sound(type="success"):
-    """Εκβιασμός ήχου μέσω Video Tag (iOS Chrome Fix)"""
+def play_sound(sound_type):
+    """Παίζει ήχο χρησιμοποιώντας το Web Audio API που είναι συμβατό με iOS Chrome"""
     s_url = "https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"
     e_url = "https://www.soundjay.com/buttons/beep-10.mp3"
-    target = s_url if type == "success" else e_url
+    url = s_url if sound_type == "success" else e_url
     
     js = f"""
         <script>
-        var v = document.createElement('video');
-        v.src = '{target}';
-        v.setAttribute('playsinline', '');
-        v.muted = false;
-        v.play();
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        var audio = new Audio('{url}');
+        audio.play().catch(function(err) {{
+            console.log("Audio failed. Device might be in silent mode.");
+        }});
+        if (navigator.vibrate) navigator.vibrate(150);
         </script>
     """
     st.components.v1.html(js, height=0)
@@ -70,9 +86,9 @@ def finalize(method):
                 "discount": 0, "final_item_price": i['price'], "method": method, "s_date": ts
             }).execute()
         
-        force_play_sound("success")
+        play_sound("success")
         st.balloons()
-        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        st.success(f"ΠΛΗΡΩΘΗΚΕ ΜΕ {method.upper()}")
         time.sleep(1.0)
         st.session_state.cart = []
         st.session_state.bc_key += 1
@@ -81,14 +97,17 @@ def finalize(method):
 
 # --- 4. MAIN UI ---
 
-# Αρχική οθόνη για "ξεκλείδωμα" ήχου
+# Η κρίσιμη οθόνη "ξεκλειδώματος"
 if not st.session_state.audio_unlocked:
-    st.markdown("<div style='text-align:center; padding-top:100px;'>", unsafe_allow_html=True)
-    st.title("🍒 CHERRY POS 14.0.27")
-    st.info("⚠️ Πατήστε το κουμπί για να ξεκινήσετε. Βεβαιωθείτε ότι ο διακόπτης στο πλάι του iPhone είναι ΑΝΟΙΧΤΟΣ.")
-    if st.button("🚀 ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ"):
+    st.markdown("<div style='text-align:center; padding-top:80px;'>", unsafe_allow_html=True)
+    st.title("🍒 CHERRY POS v14.0.28")
+    st.markdown("### ⚠️ ΟΔΗΓΙΕΣ ΓΙΑ ΤΟ ΚΙΝΗΤΟ:")
+    st.write("1. Ανεβάστε την ένταση του ήχου.")
+    st.write("2. Κλείστε τη σίγαση (διακόπτης στο πλάι).")
+    st.write("3. Πατήστε το παρακάτω κουμπί:")
+    if st.button("🔊 ΕΝΕΡΓΟΠΟΙΗΣΗ & ΕΝΑΡΞΗ"):
         st.session_state.audio_unlocked = True
-        force_play_sound("success")
+        play_sound("success")
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -98,9 +117,7 @@ st.title("🛒 ΤΑΜΕΙΟ")
 c1, c2 = st.columns([1, 1.2])
 
 with c1:
-    # Αφαιρέθηκε το auto_focus=True για να διορθωθεί το TypeError
     bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
-    
     if bc:
         res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
         if res.data:
@@ -109,8 +126,8 @@ with c1:
             st.session_state.bc_key += 1
             st.rerun()
         else:
-            force_play_sound("error")
-            st.error("Το Barcode δεν βρέθηκε!")
+            play_sound("error")
+            st.error("❌ Barcode δεν βρέθηκε!")
 
 with c2:
     total = sum(i['price'] for i in st.session_state.cart)
