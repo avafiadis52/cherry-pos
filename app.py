@@ -49,6 +49,13 @@ if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 
+if st.session_state.is_logged_out:
+    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>????? ?π????????? ?π??????</h1>", unsafe_allow_html=True)
+    if st.button("?π??????????"):
+        st.session_state.is_logged_out = False
+        st.rerun()
+    st.stop()
+
 # --- 3. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
@@ -60,16 +67,6 @@ def reset_app():
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.rerun()
-
-def play_sound(url):
-    st.components.v1.html(
-        f"""
-        <audio autoplay style="display:none">
-            <source src="{url}" type="audio/mpeg">
-        </audio>
-        """,
-        height=0,
-    )
 
 @st.dialog("?? ???????? ????? (999)")
 def manual_item_popup():
@@ -125,13 +122,9 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        # ???????? ?π??????? ??? ???π??????? ????
-        st.balloons()
-        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
+        st.balloons() 
         st.success("? ????????? ???????Ω????!")
-        
-        # ????? ??????????? ??? ?? ???????? ? ???? π??? ?? reset
-        time.sleep(2.0)
+        time.sleep(1.2)
         reset_app()
     except Exception as e: st.error(f"??????: {e}")
 
@@ -160,13 +153,6 @@ def display_report(sales_df):
         st.dataframe(day_data[['?????', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', '???????']].sort_values('?????', ascending=True), use_container_width=True, hide_index=True)
 
 # --- 4. MAIN UI ---
-if st.session_state.is_logged_out:
-    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>????? ?π????????? ?π??????</h1>", unsafe_allow_html=True)
-    if st.button("?π??????????"):
-        st.session_state.is_logged_out = False
-        st.rerun()
-    st.stop()
-
 with st.sidebar:
     now = get_athens_now()
     st.markdown(f"<div class='sidebar-date'>?? {now.strftime('%d/%m/%Y')}<br>?? {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
@@ -202,9 +188,7 @@ if view == "?? ??????":
                         item = res.data[0]
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
-                    else: 
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                        st.error("Barcode ??? ???????!")
+                    else: st.error("Barcode ??? ???????!")
             for idx, item in enumerate(st.session_state.cart):
                 if st.button(f"? {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
                     st.session_state.cart.pop(idx); st.rerun()
