@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.26", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.27", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -29,8 +29,8 @@ st.markdown("""
         border-radius: 15px !important; 
         font-weight: bold !important; 
         height: 65px !important;
+        width: 100% !important;
     }
-    .main-btn { background-color: #ffffff !important; border: 2px solid #2ecc71 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -44,22 +44,19 @@ def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def force_play_sound(type="success"):
-    """Χρησιμοποιεί HTML5 Video tag για να 'εκβιάσει' τον ήχο στο iOS"""
-    # Success chime
+    """Εκβιασμός ήχου μέσω Video Tag (iOS Chrome Fix)"""
     s_url = "https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"
-    # Error beep
     e_url = "https://www.soundjay.com/buttons/beep-10.mp3"
-    
     target = s_url if type == "success" else e_url
     
     js = f"""
         <script>
-        var video = document.createElement('video');
-        video.src = '{target}';
-        video.setAttribute('playsinline', '');
-        video.muted = false;
-        video.play();
-        if (navigator.vibrate) navigator.vibrate(200);
+        var v = document.createElement('video');
+        v.src = '{target}';
+        v.setAttribute('playsinline', '');
+        v.muted = false;
+        v.play();
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         </script>
     """
     st.components.v1.html(js, height=0)
@@ -84,11 +81,12 @@ def finalize(method):
 
 # --- 4. MAIN UI ---
 
+# Αρχική οθόνη για "ξεκλείδωμα" ήχου
 if not st.session_state.audio_unlocked:
     st.markdown("<div style='text-align:center; padding-top:100px;'>", unsafe_allow_html=True)
-    st.title("🍒 CHERRY POS 14.0.26")
-    st.info("⚠️ Παρακαλώ απενεργοποιήστε τη 'Σίγαση' (διακόπτης στο πλάι) και τη 'Λειτουργία Χαμηλής Ισχύος'.")
-    if st.button("🚀 ΕΝΑΡΞΗ & ΤΕΣΤ ΗΧΟΥ", key="unlock"):
+    st.title("🍒 CHERRY POS 14.0.27")
+    st.info("⚠️ Πατήστε το κουμπί για να ξεκινήσετε. Βεβαιωθείτε ότι ο διακόπτης στο πλάι του iPhone είναι ΑΝΟΙΧΤΟΣ.")
+    if st.button("🚀 ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ"):
         st.session_state.audio_unlocked = True
         force_play_sound("success")
         st.rerun()
@@ -100,7 +98,9 @@ st.title("🛒 ΤΑΜΕΙΟ")
 c1, c2 = st.columns([1, 1.2])
 
 with c1:
-    bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}", auto_focus=True)
+    # Αφαιρέθηκε το auto_focus=True για να διορθωθεί το TypeError
+    bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+    
     if bc:
         res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
         if res.data:
@@ -118,8 +118,8 @@ with c2:
     
     if st.session_state.cart:
         st.divider()
-        if st.button("💵 ΜΕΤΡΗΤΑ", use_container_width=True): finalize("Μετρητά")
-        if st.button("💳 ΚΑΡΤΑ", use_container_width=True): finalize("Κάρτα")
-        if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): 
+        if st.button("💵 ΜΕΤΡΗΤΑ"): finalize("Μετρητά")
+        if st.button("💳 ΚΑΡΤΑ"): finalize("Κάρτα")
+        if st.button("🗑️ ΑΚΥΡΩΣΗ"): 
             st.session_state.cart = []
             st.rerun()
