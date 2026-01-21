@@ -15,23 +15,22 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.25", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.26", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
-    label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; }
-    input { color: #000000 !important; font-size: 18px !important; }
-    .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; margin: 20px 0; }
+    label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: bold !important; }
+    input { color: #000000 !important; font-size: 20px !important; }
+    .total-label { font-size: 75px; font-weight: bold; color: #2ecc71; text-align: center; }
     div.stButton > button { 
-        background-color: #d3d3d3 !important; 
-        color: #000000 !important; 
-        border-radius: 12px !important; 
+        background-color: #f1c40f !important; 
+        color: black !important; 
+        border-radius: 15px !important; 
         font-weight: bold !important; 
-        height: 60px !important; 
-        font-size: 18px !important;
+        height: 65px !important;
     }
-    .cart-box { background-color: #2b2b2b; padding: 10px; border-radius: 10px; border: 1px solid #444; }
+    .main-btn { background-color: #ffffff !important; border: 2px solid #2ecc71 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -44,23 +43,23 @@ if 'audio_unlocked' not in st.session_state: st.session_state.audio_unlocked = F
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
-def trigger_feedback(type="success"):
-    """Στέλνει ήχο ΚΑΙ δόνηση στο κινητό"""
-    sound_url = "https://www.soundjay.com/misc/sounds/magic-chime-01.mp3" if type == "success" else "https://www.soundjay.com/buttons/beep-10.mp3"
+def force_play_sound(type="success"):
+    """Χρησιμοποιεί HTML5 Video tag για να 'εκβιάσει' τον ήχο στο iOS"""
+    # Success chime
+    s_url = "https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"
+    # Error beep
+    e_url = "https://www.soundjay.com/buttons/beep-10.mp3"
+    
+    target = s_url if type == "success" else e_url
     
     js = f"""
         <script>
-        // 1. Δόνηση (αν το υποστηρίζει η συσκευή)
-        if (navigator.vibrate) {{
-            navigator.vibrate({[200, 100, 200] if type == "error" else 150});
-        }}
-        // 2. Ήχος με προσπάθεια παράκαμψης σίγασης
-        var audio = new Audio('{sound_url}');
-        audio.volume = 1.0;
-        var playPromise = audio.play();
-        if (playPromise !== undefined) {{
-            playPromise.catch(error => {{ console.log("Playback failed"); }});
-        }}
+        var video = document.createElement('video');
+        video.src = '{target}';
+        video.setAttribute('playsinline', '');
+        video.muted = false;
+        video.play();
+        if (navigator.vibrate) navigator.vibrate(200);
         </script>
     """
     st.components.v1.html(js, height=0)
@@ -74,9 +73,9 @@ def finalize(method):
                 "discount": 0, "final_item_price": i['price'], "method": method, "s_date": ts
             }).execute()
         
-        trigger_feedback("success")
+        force_play_sound("success")
         st.balloons()
-        st.success("ΕΠΙΤΥΧΙΑ!")
+        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
         time.sleep(1.0)
         st.session_state.cart = []
         st.session_state.bc_key += 1
@@ -85,14 +84,13 @@ def finalize(method):
 
 # --- 4. MAIN UI ---
 
-# ΥΠΟΧΡΕΩΤΙΚΟ ΞΕΚΛΕΙΔΩΜΑ (User Gesture)
 if not st.session_state.audio_unlocked:
-    st.markdown("<div style='text-align:center; padding:50px;'>", unsafe_allow_html=True)
-    st.title("🍒 CHERRY POS")
-    st.write("Πατήστε το κουμπί για να ενεργοποιηθούν οι ήχοι και οι δονήσεις στο κινητό.")
-    if st.button("🚀 ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ"):
+    st.markdown("<div style='text-align:center; padding-top:100px;'>", unsafe_allow_html=True)
+    st.title("🍒 CHERRY POS 14.0.26")
+    st.info("⚠️ Παρακαλώ απενεργοποιήστε τη 'Σίγαση' (διακόπτης στο πλάι) και τη 'Λειτουργία Χαμηλής Ισχύος'.")
+    if st.button("🚀 ΕΝΑΡΞΗ & ΤΕΣΤ ΗΧΟΥ", key="unlock"):
         st.session_state.audio_unlocked = True
-        trigger_feedback("success")
+        force_play_sound("success")
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -102,7 +100,7 @@ st.title("🛒 ΤΑΜΕΙΟ")
 c1, c2 = st.columns([1, 1.2])
 
 with c1:
-    bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}", placeholder="Σκανάρετε εδώ...")
+    bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}", auto_focus=True)
     if bc:
         res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
         if res.data:
@@ -111,23 +109,17 @@ with c1:
             st.session_state.bc_key += 1
             st.rerun()
         else:
-            trigger_feedback("error")
-            st.error("Άγνωστο Barcode!")
+            force_play_sound("error")
+            st.error("Το Barcode δεν βρέθηκε!")
 
 with c2:
     total = sum(i['price'] for i in st.session_state.cart)
     st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
     
     if st.session_state.cart:
-        with st.container():
-            st.markdown("<div class='cart-box'>", unsafe_allow_html=True)
-            for item in st.session_state.cart:
-                st.write(f"• {item['name']} - {item['price']}€")
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-        st.write("")
-        if st.button("💵 ΜΕΤΡΗΤΑ"): finalize("Μετρητά")
-        if st.button("💳 ΚΑΡΤΑ"): finalize("Κάρτα")
-        if st.button("🗑️ ΑΚΥΡΩΣΗ"): 
+        st.divider()
+        if st.button("💵 ΜΕΤΡΗΤΑ", use_container_width=True): finalize("Μετρητά")
+        if st.button("💳 ΚΑΡΤΑ", use_container_width=True): finalize("Κάρτα")
+        if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): 
             st.session_state.cart = []
             st.rerun()
