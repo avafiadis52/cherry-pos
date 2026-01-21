@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.20", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.21", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -32,6 +32,7 @@ st.markdown("""
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
+    .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; text-align: left; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -42,7 +43,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'audio_unlocked' not in st.session_state: st.session_state.audio_unlocked = False
+if 'unlock_audio' not in st.session_state: st.session_state.unlock_audio = False
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -56,12 +57,23 @@ def reset_app():
     st.session_state.ph_key += 1
     st.rerun()
 
-def play_sound(url):
-    # Δημιουργούμε ένα iframe που παίζει τον ήχο αυτόματα
-    st.components.v1.html(f"""
-        <iframe src="{url}" allow="autoplay" style="display:none"></iframe>
-        <audio autoplay><source src="{url}" type="audio/mpeg"></audio>
-    """, height=0)
+def play_sound_js(sound_url):
+    # Εξελιγμένο JavaScript για Chrome Mobile
+    js_code = f"""
+        <script>
+        (function() {{
+            var audio = new Audio('{sound_url}');
+            audio.play().catch(function(e) {{
+                // Αν αποτύχει, δοκιμάζουμε με κλικ
+                console.log("Audio failed, retrying via click simulation");
+                var clickEvt = new MouseEvent('click');
+                audio.dispatchEvent(clickEvt);
+                audio.play();
+            }});
+        }})();
+        </script>
+    """
+    st.components.v1.html(js_code, height=0)
 
 @st.dialog("📦 Ελεύθερο Είδος (999)")
 def manual_item_popup():
@@ -113,7 +125,8 @@ def finalize(disc_val, method):
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
         
-        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
+        # Ήχος Επιτυχίας
+        play_sound_js("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         st.balloons()
         st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
         time.sleep(2.0)
@@ -121,14 +134,18 @@ def finalize(disc_val, method):
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 # --- 4. MAIN UI ---
-if not st.session_state.audio_unlocked:
-    if st.button("🔔 ΕΝΕΡΓΟΠΟΙΗΣΗ ΗΧΟΥ (ΠΑΤΗΣΤΕ ΕΔΩ)"):
-        st.session_state.audio_unlocked = True
+
+# Κουμπί Αρχικοποίησης Ήχου για Chrome Mobile
+if not st.session_state.unlock_audio:
+    st.markdown("<div style='text-align:center; margin-top:50px;'>", unsafe_allow_html=True)
+    if st.button("🚀 ΕΝΑΡΞΗ ΒΑΡΔΙΑΣ (Ενεργοποίηση Ήχων)", use_container_width=True):
+        st.session_state.unlock_audio = True
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 with st.sidebar:
-    st.title("CHERRY 14.0.20")
+    st.title("CHERRY 14.0.21")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
 
 if view == "🛒 ΤΑΜΕΙΟ":
@@ -155,7 +172,8 @@ if view == "🛒 ΤΑΜΕΙΟ":
                         st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                         st.session_state.bc_key += 1; st.rerun()
                     else: 
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+                        # Ήχος Σφάλματος
+                        play_sound_js("https://www.soundjay.com/buttons/beep-10.mp3")
                         st.error("Barcode δεν βρέθηκε!")
             
             if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
