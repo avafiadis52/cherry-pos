@@ -15,103 +15,117 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.29", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.30", layout="wide", page_icon="🍒")
 
-# Στυλ για να αναβοσβήνει η οθόνη σε λάθος ή επιτυχία
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
-    label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: bold !important; }
-    input { color: #000000 !important; font-size: 20px !important; }
-    .total-label { font-size: 80px; font-weight: bold; color: #2ecc71; text-align: center; }
-    
-    /* Animation για Λάθος (Κόκκινο) */
-    @keyframes flash-red {
-        0% { background-color: #c0392b; }
-        100% { background-color: #1a1a1a; }
-    }
-    .flash-error { animation: flash-red 0.5s; }
-
-    /* Animation για Επιτυχία (Πράσινο) */
-    @keyframes flash-green {
-        0% { background-color: #27ae60; }
-        100% { background-color: #1a1a1a; }
-    }
-    .flash-success { animation: flash-green 0.5s; }
-    
-    div.stButton > button { 
-        background-color: #f1c40f !important; 
-        color: black !important; 
-        border-radius: 12px !important; 
-        font-weight: bold !important; 
-        height: 60px !important;
-        font-size: 18px !important;
-    }
+    label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
+    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p, div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p { color: #111111 !important; }
+    input { color: #000000 !important; }
+    .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
+    .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
+    .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
+    .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; margin: 10px 0; border: 2px solid #e44d26; padding: 10px; border-radius: 10px; background-color: #fff3f0; }
+    div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
+    .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; display: flex; justify-content: space-between; align-items: center; }
     </style>
     """, unsafe_allow_html=True)
 
 # Session States
 if 'cart' not in st.session_state: st.session_state.cart = []
+if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
+if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανική Πώληση"
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
-if 'visual_feedback' not in st.session_state: st.session_state.visual_feedback = None
+if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
-def finalize(method):
+def reset_app():
+    st.session_state.cart = []
+    st.session_state.selected_cust_id = None
+    st.session_state.cust_name = "Λιανική Πώληση"
+    st.session_state.bc_key += 1; st.session_state.ph_key += 1
+    st.rerun()
+
+def play_sound(url):
+    st.components.v1.html(f"""
+        <audio autoplay><source src="{url}" type="audio/mpeg"></audio>
+    """, height=0)
+
+@st.dialog("💰 Πληρωμή")
+def payment_popup():
+    total = sum(i['price'] for i in st.session_state.cart)
+    st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
+    st.divider()
+    c1, c2 = st.columns(2)
+    if c1.button("💵 Μετρητά", use_container_width=True): finalize(0, "Μετρητά")
+    if c2.button("💳 Κάρτα", use_container_width=True): finalize(0, "Κάρτα")
+
+def finalize(disc, method):
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
+    c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
-            supabase.table("sales").insert({
-                "barcode": str(i['bc']), "item_name": i['name'], "unit_price": i['price'],
-                "discount": 0, "final_item_price": i['price'], "method": method, "s_date": ts
-            }).execute()
+            data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": 0, "final_item_price": float(i['price']), "method": str(method), "s_date": ts, "cust_id": c_id}
+            supabase.table("sales").insert(data).execute()
         
-        st.session_state.visual_feedback = "success"
+        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         st.balloons()
-        time.sleep(0.5)
-        st.session_state.cart = []
-        st.session_state.bc_key += 1
-        st.rerun()
+        st.success("Η ΣΥΝΑΛΛΑΓΗ ΟΛΟΚΛΗΡΩΘΗΚΕ!")
+        time.sleep(1.5)
+        reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 # --- 4. MAIN UI ---
+with st.sidebar:
+    st.title("CHERRY 14.0.30")
+    view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
 
-# Εφαρμογή του εφέ στην οθόνη
-if st.session_state.visual_feedback == "error":
-    st.markdown("<script>document.body.classList.add('flash-error');</script>", unsafe_allow_html=True)
-    st.session_state.visual_feedback = None
-elif st.session_state.visual_feedback == "success":
-    st.markdown("<script>document.body.classList.add('flash-success');</script>", unsafe_allow_html=True)
-    st.session_state.visual_feedback = None
-
-st.title("🛒 ΤΑΜΕΙΟ")
-c1, c2 = st.columns([1, 1.2])
-
-with c1:
-    bc = st.text_input("Σάρωση Barcode", key=f"bc_{st.session_state.bc_key}")
-    if bc:
-        res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
-        if res.data:
-            item = res.data[0]
-            st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': float(item['price'])})
-            st.session_state.bc_key += 1
-            st.rerun()
-        else:
-            st.session_state.visual_feedback = "error"
-            st.error("❌ Barcode δεν βρέθηκε!")
-            # Δόνηση (μόνο αν το επιτρέπει η συσκευή)
-            st.components.v1.html("<script>if(navigator.vibrate) navigator.vibrate(200);</script>", height=0)
-
-with c2:
-    total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+if view == "🛒 ΤΑΜΕΙΟ":
+    st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+    cl, cr = st.columns([1, 1.5])
     
-    if st.session_state.cart:
-        st.divider()
-        if st.button("💵 ΜΕΤΡΗΤΑ", use_container_width=True): finalize("Μετρητά")
-        if st.button("💳 ΚΑΡΤΑ", use_container_width=True): finalize("Κάρτα")
-        if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): 
-            st.session_state.cart = []
-            st.rerun()
+    with cl:
+        if st.session_state.selected_cust_id is None:
+            ph = st.text_input("Τηλέφωνο Πελάτη", key=f"ph_{st.session_state.ph_key}")
+            if ph:
+                res = supabase.table("customers").select("*").eq("phone", ph.strip()).execute()
+                if res.data: 
+                    st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
+                    st.rerun()
+                else: st.warning("Ο πελάτης δεν βρέθηκε.")
+            if st.button("🛒 ΛΙΑΝΙΚΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
+        else:
+            bc = st.text_input("Σάρωση Barcode", key=f"bc_{st.session_state.bc_key}")
+            if bc:
+                res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
+                if res.data:
+                    item = res.data[0]
+                    st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                    st.session_state.bc_key += 1; st.rerun()
+                else: 
+                    play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+                    st.error("Barcode δεν βρέθηκε!")
+            
+            if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
+            if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+            
+    with cr:
+        total = sum(i['price'] for i in st.session_state.cart)
+        st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+        
+        # Λίστα καλαθιού με ήχο αφαίρεσης
+        for idx, item in enumerate(st.session_state.cart):
+            col_a, col_b = st.columns([4, 1])
+            col_a.markdown(f"<div class='data-row'>{item['name']} - {item['price']}€</div>", unsafe_allow_html=True)
+            if col_b.button("❌", key=f"del_{idx}"):
+                # Ήχος αφαίρεσης
+                play_sound("https://www.soundjay.com/buttons/button-50.mp3")
+                st.session_state.cart.pop(idx)
+                time.sleep(0.1) # Μικρή καθυστέρηση για να προλάβει να ακουστεί
+                st.rerun()
+
+# (MANAGER, ΑΠΟΘΗΚΗ κτλ παραμένουν ως είχαν στην 14.0.19)
