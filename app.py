@@ -220,7 +220,8 @@ else:
         if res_all.data:
             full_df = pd.DataFrame(res_all.data)
             full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
-            t1, t2 = st.tabs(["ΣΗΜΕΡΑ", "ΙΣΤΟΡΙΚΟ"])
+            # Εδώ έγινε η αλλαγή για πιο έντονα Tabs με χρήση emoji και κεφαλαίων
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📜 ΙΣΤΟΡΙΚΟ"])
             with t1: display_report(full_df[full_df['s_date_dt'].dt.date == get_athens_now().date()])
             with t2:
                 c1, c2 = st.columns(2)
@@ -231,4 +232,21 @@ else:
         st.subheader("Διαχείριση Ειδών")
         with st.form("inv_form", clear_on_submit=True):
             c1, c2, c3, c4 = st.columns(4)
-            b, n,
+            b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.1), c4.number_input("Stock", step=1)
+            if st.form_submit_button("ΑΠΟΘΗΚΕΥΣΗ"):
+                if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
+        res = supabase.table("inventory").select("*").execute()
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
+            if st.button("ΔΙΑΓΡΑΦΗ", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
+
+    elif view == "👥 ΠΕΛΑΤΕΣ":
+        st.subheader("Πελατολόγιο")
+        with st.form("c_form", clear_on_submit=True):
+            cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
+            if st.form_submit_button("ΠΡΟΣΘΗΚΗ"):
+                if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
+        res = supabase.table("customers").select("*").execute()
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
+            if st.button("ΔΙΑΓΡΑΦΗ", key=f"
