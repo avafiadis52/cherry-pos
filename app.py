@@ -15,19 +15,19 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.44", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.45", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
-    /* Στυλ για το πεδίο εισαγωγής ώστε να φαίνεται καθαρά η μάσκα */
     input { 
         color: #000000 !important; 
         font-family: 'Courier New', monospace !important; 
-        font-size: 1.5rem !important; 
-        letter-spacing: 4px !important; 
+        font-size: 1.6rem !important; 
+        letter-spacing: 5px !important; 
         font-weight: bold !important;
+        text-align: center !important;
     }
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
@@ -43,6 +43,8 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
+# State για το τηλέφωνο
+if 'phone_val' not in st.session_state: st.session_state.phone_val = ""
 
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
@@ -51,6 +53,7 @@ def reset_app():
     st.session_state.cart = []
     st.session_state.selected_cust_id = None
     st.session_state.cust_name = "Λιανική Πώληση"
+    st.session_state.phone_val = ""
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.rerun()
@@ -89,7 +92,7 @@ if st.session_state.is_logged_out:
     st.stop()
 
 with st.sidebar:
-    st.title(f"CHERRY 14.0.44")
+    st.title("CHERRY 14.0.45")
     view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
 
 if view == "🛒 ΤΑΜΕΙΟ":
@@ -97,29 +100,34 @@ if view == "🛒 ΤΑΜΕΙΟ":
     cl, cr = st.columns([1, 1.5])
     with cl:
         if st.session_state.selected_cust_id is None:
-            # Λογική Μάσκας:
-            raw_input = st.text_input("Τηλέφωνο Πελάτη", value="----------", key=f"ph_{st.session_state.ph_key}")
+            # Λογική Μάσκας που σβήνει παύλες
+            current_digits = "".join([c for c in st.session_state.phone_val if c.isdigit()])[:10]
+            display_val = current_digits + ("-" * (10 - len(current_digits)))
             
-            # Καθαρισμός της εισαγωγής (κρατάμε μόνο τα νούμερα)
-            clean_phone = "".join([c for c in raw_input if c.isdigit()])
+            phone_input = st.text_input("Τηλέφωνο Πελάτη", value=display_val, key=f"ph_input_{st.session_state.ph_key}")
             
-            if clean_phone: # Αν ο χρήστης άρχισε να γράφει
-                # Αν αυτό που έγραψε δεν είναι νούμερο ή είναι πάνω από 10
-                if len(clean_phone) > 10:
+            # Επεξεργασία μετά την είσοδο
+            clean_phone = "".join([c for c in phone_input if c.isdigit()])
+            
+            if phone_input != display_val: # Αν άλλαξε το περιεχόμενο
+                if len(clean_phone) <= 10:
+                    st.session_state.phone_val = clean_phone
+                    st.rerun()
+                else:
                     play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                    st.error("⚠️ Μέγιστο 10 ψηφία!")
-                
-                # Όταν πατηθεί Enter
-                if len(clean_phone) == 10:
-                    res = supabase.table("customers").select("*").eq("phone", clean_phone).execute()
-                    if res.data: 
-                        st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
-                        st.rerun()
-                    else:
-                        new_customer_popup(clean_phone)
-                elif len(clean_phone) > 0 and raw_input != "----------" and len(clean_phone) != 10:
-                    # Εδώ μπορούμε να αφήσουμε το χρήστη να πληκτρολογεί
-                    pass
+                    st.error("⚠️ Μόνο 10 ψηφία!")
+            
+            # Έλεγχος ολοκλήρωσης (10 ψηφία)
+            if len(clean_phone) == 10:
+                res = supabase.table("customers").select("*").eq("phone", clean_phone).execute()
+                if res.data: 
+                    st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
+                    st.session_state.phone_val = ""
+                    st.rerun()
+                else:
+                    new_customer_popup(clean_phone)
+            elif len(clean_phone) > 0 and len(clean_phone) < 10 and "\n" in phone_input: # Αν πάτησε enter πρόωρα
+                 play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
 
             if st.button("🛒 ΛΙΑΝΙΚΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
         else:
@@ -130,13 +138,25 @@ if view == "🛒 ΤΑΜΕΙΟ":
                 if res.data:
                     st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
                     st.session_state.bc_key += 1; st.rerun()
+                else:
+                    play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+            
             if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
             if st.button("🗑️ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+            
     with cr:
         total = sum(i['price'] for i in st.session_state.cart)
-        st.markdown(f"<div class='cart-area'>{chr(10).join([f'{i['name'][:20]:<20} | {i['price']:>6.2f}€' for i in st.session_state.cart])}</div>", unsafe_allow_html=True)
+        lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
+        st.markdown(f"<div class='cart-area'>{chr(10).join(lines)}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
 elif view == "📊 MANAGER":
-    res = supabase.table("sales").select("*").execute()
-    if res.data: st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+    st.write("Στατιστικά Πωλήσεων")
+
+elif view == "📦 ΑΠΟΘΗΚΗ":
+    st.write("Διαχείριση Αποθέματος")
+
+elif view == "👥 ΠΕΛΑΤΕΣ":
+    res = supabase.table("customers").select("*").execute()
+    if res.data:
+        for r in res.data: st.write(f"👤 {r['name']} - 📞 {r['phone']}")
