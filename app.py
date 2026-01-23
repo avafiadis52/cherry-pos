@@ -26,11 +26,6 @@ supabase = init_supabase()
 st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="🍒")
 
 st.markdown("""
-    <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
-    <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
-    """, unsafe_allow_html=True)
-
-st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
@@ -56,6 +51,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
+if 'last_speech' not in st.session_state: st.session_state.last_speech = None
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -67,6 +63,7 @@ def reset_app():
     st.session_state.cust_name = "Λιανική Πώληση"
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
+    st.session_state.last_speech = None
     st.rerun()
 
 def play_sound(url):
@@ -176,15 +173,17 @@ else:
         
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input_fixed')
-            if text:
+            # Χρήση σταθερού κλειδιού αλλά έλεγχος περιεχομένου για αποφυγή loop
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input')
+            
+            if text and text != st.session_state.last_speech:
+                st.session_state.last_speech = text # Αποθήκευση για να μην ξαναμπεί στο loop
                 cmd = text.lower().strip()
-                processed = False
+                
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     item = res.data[0]
                     st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                    processed = True
                 else:
                     numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
                     if numbers:
@@ -192,11 +191,8 @@ else:
                         name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").strip()
                         if not name: name = "Ελεύθερο Είδος"
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                        processed = True
                 
-                # ΚΑΘΑΡΙΣΜΟΣ ΜΝΗΜΗΣ ΕΝΤΟΛΗΣ
-                if processed:
-                    st.rerun()
+                st.rerun()
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", key="logout_btn", use_container_width=True): 
@@ -284,5 +280,4 @@ else:
                 if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
         res = supabase.table("customers").select("*").execute()
         for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row
