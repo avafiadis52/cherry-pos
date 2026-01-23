@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.70", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.71", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -118,7 +118,7 @@ def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
-    action_id = int(time.time())
+    action_id = int(time.time()) # Μοναδικό ID για την πράξη
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
@@ -145,7 +145,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.70")
+        st.title("CHERRY 14.0.71")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -167,6 +167,7 @@ else:
                         play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                         speak_text("Δεν κατάλαβα")
                         st.warning("Συγγνώμη, δεν κατάλαβα")
+
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -209,55 +210,58 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 MANAGER - v14.0.19 Logic")
-        rep_type = st.radio("Τύπος Αναφοράς", ["ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "ΠΕΡΙΟΔΟΥ"], horizontal=True)
-        
-        target_date_from = get_athens_now().date()
-        target_date_to = get_athens_now().date()
-        
-        if rep_type == "ΠΕΡΙΟΔΟΥ":
-            c1, c2 = st.columns(2)
-            target_date_from = c1.date_input("Από", get_athens_now().date())
-            target_date_to = c2.date_input("Έως", get_athens_now().date())
+        st.header("📊 Αναφορές Πωλήσεων")
+        t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΠΕΡΙΟΔΟΥ"])
         
         res = supabase.table("sales").select("*").execute()
         if res.data:
-            df = pd.DataFrame(res.data)
+            full_df = pd.DataFrame(res.data)
+            full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
             
-            # Έλεγχος αν υπάρχει η στήλη action_id, αλλιώς δημιουργία της
-            if 'action_id' not in df.columns:
-                df['action_id'] = "-"
-            
-            df['s_date_dt'] = pd.to_datetime(df['s_date']).dt.date
-            mask = (df['s_date_dt'] >= target_date_from) & (df['s_date_dt'] <= target_date_to)
-            f_df = df[mask].copy()
-            
-            if not f_df.empty:
-                f_df = f_df.sort_values('s_date', ascending=False)
-                m_sum = f_df[f_df['method'] == 'Μετρητά']['final_item_price'].sum()
-                k_sum = f_df[f_df['method'] == 'Κάρτα']['final_item_price'].sum()
-                d_sum = f_df['discount'].sum()
-                t_sum = f_df['final_item_price'].sum()
+            def render_manager_table(data_df):
+                if data_df.empty:
+                    st.info("Δεν βρέθηκαν πωλήσεις.")
+                    return
                 
-                c1, c2, c3, c4 = st.columns(4)
-                c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='report-stat'><p class='stat-label'>Έκπτωση</p><p class='stat-val' style='color:#e74c3c'>{d_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c4.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val' style='color:#3498db'>{t_sum:.2f}€</p></div>", unsafe_allow_html=True)
+                # Ομαδοποίηση και απόδοση αύξουσας σειράς πράξης (action_id)
+                data_df = data_df.sort_values('s_date', ascending=True)
+                unique_actions = data_df['action_id'].unique()
+                action_map = {act: i+1 for i, act in enumerate(unique_actions)}
+                data_df['ΠΡΑΞΗ'] = data_df['action_id'].map(action_map)
                 
-                # Μετονομασία στηλών για εμφάνιση
-                out = f_df.rename(columns={
-                    'action_id': 'Πράξη',
-                    'item_name': 'Είδος',
-                    'unit_price': 'Αρχική',
-                    'discount': 'Έκπτωση',
-                    'final_item_price': 'Τελική',
-                    'method': 'Τρόπος',
-                    's_date': 'Ημ/νία'
-                })
-                # Επιλογή μόνο των στηλών που θέλουμε να δείξουμε
-                st.dataframe(out[['Πράξη', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Τρόπος']], use_container_width=True)
-            else: st.info("Δεν βρέθηκαν πωλήσεις.")
+                # Αντίστροφη σειρά για την εμφάνιση (πιο πρόσφατες πάνω)
+                disp_df = data_df.sort_values('s_date', ascending=False)
+                
+                # Υπολογισμοί για τα στατιστικά
+                m_df = data_df[data_df['method'] == 'Μετρητά']
+                k_df = data_df[data_df['method'] == 'Κάρτα']
+                
+                m_sum = m_df['final_item_price'].sum()
+                k_sum = k_df['final_item_price'].sum()
+                t_sum = data_df['final_item_price'].sum()
+                
+                m_count = m_df['action_id'].nunique()
+                k_count = k_df['action_id'].nunique()
+                t_count = data_df['action_id'].nunique()
+
+                c1, c2, c3 = st.columns(3)
+                c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
+                c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
+                c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο ({t_count})</p><p class='stat-val'>{t_sum:.2f}€</p></div>", unsafe_allow_html=True)
+                
+                st.dataframe(disp_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method']], use_container_width=True)
+
+            with t1:
+                today = get_athens_now().date()
+                df_today = full_df[full_df['s_date_dt'].dt.date == today].copy()
+                render_manager_table(df_today)
+
+            with t2:
+                c1, c2 = st.columns(2)
+                d_from = c1.date_input("Από", today)
+                d_to = c2.date_input("Έως", today)
+                df_period = full_df[(full_df['s_date_dt'].dt.date >= d_from) & (full_df['s_date_dt'].dt.date <= d_to)].copy()
+                render_manager_table(df_period)
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
