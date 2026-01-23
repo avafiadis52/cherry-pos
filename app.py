@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE (v14.0.55) ---
-st.set_page_config(page_title="CHERRY v14.0.68", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -34,7 +34,6 @@ st.markdown("""
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; border: 1px solid #ffffff !important; font-weight: bold !important; }
-    .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; text-align: left; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -85,30 +84,28 @@ if st.session_state.is_logged_out:
     if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
 else:
     with st.sidebar:
-        st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.68")
+        st.title("CHERRY 14.0.55")
         
-        # Ενσωμάτωση ΜΟΝΟ της έξυπνης φωνητικής λειτουργίας
+        # Η ΜΟΝΗ ΑΛΛΑΓΗ: Προσθήκη mic recorder με την έξυπνη λογική ελεύθερου είδους
         if HAS_MIC:
-            st.write("🎤 Φωνητική Είσοδος")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος & Τιμή", stop_prompt="Τέλος", key='voice_input')
+            text = speech_to_text(language='el', start_prompt="🎤 Φωνητική Εντολή", key='v_input')
             if text:
                 cmd = text.lower().strip()
-                # Εξαγωγή αριθμού για την τιμή
-                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
-                if numbers:
-                    price = float(numbers[0])
-                    name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").replace("euro", "").strip()
-                    if not name: name = "Ελεύθερο Είδος"
-                    st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                    st.toast(f"✅ {name}: {price}€")
+                # 1. Αναζήτηση στην αποθήκη πρώτα
+                res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
+                if res.data:
+                    item = res.data[0]
+                    st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                    st.toast(f"➕ {item['name']}")
                 else:
-                    # Αναζήτηση στην αποθήκη αν δεν υπάρχει τιμή στη φράση
-                    res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
-                    if res.data:
-                        item = res.data[0]
-                        st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                        st.toast(f"➕ {item['name']}")
+                    # 2. Αν δεν βρεθεί, έλεγχος για αριθμό (τιμή) στη φράση
+                    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
+                    if numbers:
+                        price = float(numbers[0])
+                        name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").strip()
+                        if not name: name = "Ελεύθερο Είδος"
+                        st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
+                        st.toast(f"✅ {name}: {price}€")
 
         st.divider()
         view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
