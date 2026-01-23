@@ -26,6 +26,11 @@ supabase = init_supabase()
 st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="🍒")
 
 st.markdown("""
+    <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
+    <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
+    """, unsafe_allow_html=True)
+
+st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
@@ -173,13 +178,10 @@ else:
         
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            # Χρήση σταθερού κλειδιού αλλά έλεγχος περιεχομένου για αποφυγή loop
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input')
-            
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input_unique')
             if text and text != st.session_state.last_speech:
-                st.session_state.last_speech = text # Αποθήκευση για να μην ξαναμπεί στο loop
+                st.session_state.last_speech = text
                 cmd = text.lower().strip()
-                
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     item = res.data[0]
@@ -191,7 +193,6 @@ else:
                         name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").strip()
                         if not name: name = "Ελεύθερο Είδος"
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                
                 st.rerun()
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
@@ -280,4 +281,5 @@ else:
                 if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
         res = supabase.table("customers").select("*").execute()
         for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
+            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
