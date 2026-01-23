@@ -56,6 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
+if 'v_key' not in st.session_state: st.session_state.v_key = 0 # Για δυναμικό καθαρισμό του μικροφώνου
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -67,6 +68,7 @@ def reset_app():
     st.session_state.cust_name = "Λιανική Πώληση"
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
+    st.session_state.v_key += 1 # Reset και το μικρόφωνο
     st.rerun()
 
 def play_sound(url):
@@ -172,16 +174,22 @@ else:
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
         st.title("CHERRY 14.0.55")
         
+        # --- ΔΙΟΡΘΩΜΕΝΗ ΦΩΝΗΤΙΚΗ ΕΝΤΟΛΗ ---
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_pos_fixed')
+            v_key = f"v_input_{st.session_state.v_key}"
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=v_key)
+            
             if text:
                 cmd = text.lower().strip()
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
+                
+                added = False
                 if res.data:
                     item = res.data[0]
                     st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                     st.toast(f"➕ {item['name']}")
+                    added = True
                 else:
                     numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
                     if numbers:
@@ -190,6 +198,12 @@ else:
                         if not name: name = "Ελεύθερο Είδος"
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
                         st.toast(f"✅ {name}: {price}€")
+                        added = True
+                
+                # Κρίσιμο: Μόλις γίνει η προσθήκη, αλλάζουμε το κλειδί για να "ξεχάσει" την εντολή
+                if added:
+                    st.session_state.v_key += 1
+                    st.rerun()
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", key="logout_btn", use_container_width=True): 
