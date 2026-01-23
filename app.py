@@ -1,5 +1,4 @@
-# CHERRY POS SYSTEM - VERSION: 14.0.90
-# CHANGES: MERGED v14.0.63 STABILITY WITH v14.0.88 REPORTS
+# CHERRY POS SYSTEM - VERSION: 14.0.63
 
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -26,7 +25,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.90", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.63", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -40,9 +39,12 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-    .report-stat { background-color: #1e272e; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #2ecc71; }
-    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
-    .stat-label { font-size: 12px; color: #888; font-weight: bold; text-transform: uppercase; }
+    .report-stat { background-color: #262730; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 5px; }
+    .grand-stat { background-color: #1e272e; border: 2px solid #2ecc71; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+    .stat-val { font-size: 20px; font-weight: bold; color: #2ecc71; margin: 0; }
+    .stat-val-disc { font-size: 20px; font-weight: bold; color: #e74c3c; margin: 0; }
+    .stat-label { font-size: 11px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
+    .day-title { color: #f1c40f; font-size: 22px; font-weight: bold; border-bottom: 2px solid #f1c40f; margin-top: 30px; margin-bottom: 15px; padding-bottom: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -117,7 +119,7 @@ if st.session_state.get('is_logged_out', False):
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY v14.0.90")
+        st.title("CHERRY v14.0.63")
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         st.markdown("---")
         voice_active = st.checkbox("🎤 Ενεργοποίηση Φωνής", value=True)
@@ -125,6 +127,7 @@ else:
 
     if view == "🛒 ΤΑΜΕΙΟ":
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+        
         if voice_active and HAS_MIC:
             speech = speech_to_text(language='el-GR', start_prompt="🎤 Πες Προϊόν...", key=f"mic_{st.session_state.mic_key}")
             if speech and speech != st.session_state.last_speech:
@@ -152,52 +155,3 @@ else:
                     st.session_state.selected_cust_id = 0; play_sound("https://www.soundjay.com/buttons/sounds/button-16.mp3"); st.rerun()
             else:
                 st.button(f"👤 {st.session_state.cust_name}", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
-                bc = st.text_input("🏷️ Barcode", key=f"bc_{st.session_state.bc_key}")
-                if bc:
-                    if bc == "999": manual_item_popup()
-                    else:
-                        res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
-                        if res.data:
-                            st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
-                            play_sound("https://www.soundjay.com/buttons/sounds/button-50.mp3"); st.session_state.bc_key += 1; st.rerun()
-                for idx, item in enumerate(st.session_state.cart):
-                    if st.button(f"❌ {item['name']} | {item['price']}€", key=f"del_{idx}", use_container_width=True): 
-                        st.session_state.cart.pop(idx); st.rerun()
-                if st.session_state.cart and st.button("💳 ΤΑΜΕΙΟ", use_container_width=True): payment_popup()
-            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
-        
-        with cr:
-            total = sum(i['price'] for i in st.session_state.cart)
-            st.markdown(f"<div class='cart-area'>{'ΠΕΡΙΓΡΑΦΗ':<20} | {'ΤΙΜΗ':>6}\n{'-'*30}\n" + "\n".join([f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]) + "</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
-
-    elif view == "📊 MANAGER":
-        st.header("📊 Αναφορές Πωλήσεων")
-        res = supabase.table("sales").select("*").execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            df['date_only'] = pd.to_datetime(df['s_date']).dt.date
-            today_df = df[df['date_only'] == get_athens_now().date()]
-            
-            c1, c2, c3 = st.columns(3)
-            with c1: st.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ</p><p class='stat-val'>{today_df[today_df['method']=='Μετρητά']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-            with c2: st.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ</p><p class='stat-val'>{today_df[today_df['method']=='Κάρτα']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-            with c3: st.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ ΗΜΕΡΑΣ</p><p class='stat-val'>{today_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-            
-            st.markdown("### Πρόσφατες Συναλλαγές")
-            st.dataframe(today_df[['s_date', 'item_name', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True)
-
-    elif view == "📦 ΑΠΟΘΗΚΗ":
-        with st.form("inv_f", clear_on_submit=True):
-            c1, c2, c3, c4 = st.columns(4)
-            b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
-            if st.form_submit_button("➕ Προσθήκη"):
-                supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-        for r in supabase.table("inventory").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
-            if st.button("🗑️", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif view == "👥 ΠΕΛΑΤΕΣ":
-        for r in supabase.table("customers").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-            if st.button("🗑️", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
