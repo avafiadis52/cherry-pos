@@ -38,8 +38,6 @@ st.markdown("""
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     .report-stat { background-color: #262730; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 5px; }
-    .stat-val { font-size: 18px; font-weight: bold; color: #2ecc71; margin: 0; }
-    .stat-label { font-size: 10px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -115,14 +113,19 @@ else:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         st.title("CHERRY v14.0.66")
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
+        
         st.markdown("---")
+        # Εδώ είναι η σωστή πλευρική μπάρα με τις ρυθμίσεις φωνής
         voice_active = st.checkbox("🎤 Ενεργοποίηση Φωνής", value=True)
+        if voice_active:
+            st.info("Το μικρόφωνο είναι έτοιμο.")
+            
         if st.button("❌ Έξοδος", use_container_width=True): st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
     if view == "🛒 ΤΑΜΕΙΟ":
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
         
-        # --- VOICE INTEGRATION ---
+        # --- VOICE INTEGRATION (v14.0.66 logic) ---
         if voice_active and HAS_MIC:
             speech = speech_to_text(language='el-GR', start_prompt="🎤 Πες Προϊόν...", key=f"mic_{st.session_state.mic_key}")
             if speech and speech != st.session_state.last_speech:
@@ -149,7 +152,7 @@ else:
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): 
                     st.session_state.selected_cust_id = 0; play_sound("https://www.soundjay.com/buttons/sounds/button-16.mp3"); st.rerun()
             else:
-                st.button(f"👤 {st.session_state.cust_name}", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
                 bc = st.text_input("🏷️ Barcode", key=f"bc_{st.session_state.bc_key}")
                 if bc:
                     if bc == "999": manual_item_popup()
@@ -177,13 +180,12 @@ else:
         if res.data:
             df = pd.DataFrame(res.data)
             df['date_only'] = pd.to_datetime(df['s_date']).dt.date
-            today = get_athens_now().date()
-            today_df = df[df['date_only'] == today]
+            today_df = df[df['date_only'] == get_athens_now().date()]
             
             c1, c2, c3 = st.columns(3)
-            c1.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ</p><p class='stat-val'>{today_df[today_df['method']=='Μετρητά']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-            c2.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ</p><p class='stat-val'>{today_df[today_df['method']=='Κάρτα']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-            c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{today_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+            c1.metric("Μετρητά", f"{today_df[today_df['method']=='Μετρητά']['final_item_price'].sum():.2f}€")
+            c2.metric("Κάρτα", f"{today_df[today_df['method']=='Κάρτα']['final_item_price'].sum():.2f}€")
+            c3.metric("Σύνολο", f"{today_df['final_item_price'].sum():.2f}€")
             st.dataframe(today_df[['s_date', 'item_name', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
