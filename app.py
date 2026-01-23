@@ -15,7 +15,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="??")
+st.set_page_config(page_title="CHERRY v14.0.19", layout="wide", page_icon="??")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -27,7 +27,7 @@ st.markdown("""
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p, div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p { color: #111111 !important; }
-    input { color: #000000 !important; font-weight: bold !important; font-size: 1.2rem !important; }
+    input { color: #000000 !important; }
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
@@ -63,11 +63,15 @@ def reset_app():
 
 def play_sound(url):
     st.components.v1.html(
-        f"""<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>""",
+        f"""
+        <audio autoplay style="display:none">
+            <source src="{url}" type="audio/mpeg">
+        </audio>
+        """,
         height=0,
     )
 
-@st.dialog("? ??????????? ????? (999)")
+@st.dialog("?? ???????? ????? (999)")
 def manual_item_popup():
     m_name = st.text_input("????? ??????")
     m_price = st.number_input("???? (€)", min_value=0.0, format="%.2f", step=0.1)
@@ -83,8 +87,6 @@ def new_customer_popup(phone=""):
     if st.button("?π????????", use_container_width=True):
         res = supabase.table("customers").insert({"name": name, "phone": phone_val}).execute()
         if res.data:
-            st.session_state.selected_cust_id = res.data[0]['id']
-            st.session_state.cust_name = res.data[0]['name']
             st.success("?π??????????!"); time.sleep(0.5); st.rerun()
 
 @st.dialog("?? ???????")
@@ -99,7 +101,7 @@ def payment_popup():
             try:
                 if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
                 else: disc = round(float(inp), 2)
-            except: st.error("????? ?????")
+            except: st.error("?????? ?????")
     final_p = round(total - disc, 2)
     st.markdown(f"<div class='final-amount-popup'>????Ω???: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
@@ -122,15 +124,20 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
+        
+        # ???????? ?π??????? ??? ???π??????? ????
         st.balloons()
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
+        st.success("? ????????? ???????Ω????!")
+        
+        # ????? ??????????? ??? ?? ???????? ? ???? π??? ?? reset
         time.sleep(2.0)
         reset_app()
     except Exception as e: st.error(f"??????: {e}")
 
 def display_report(sales_df):
     if sales_df.empty:
-        st.info("??? ???????? π???????."); return
+        st.info("??? ?π?????? ????????."); return
     cust_res = supabase.table("customers").select("id, name").execute()
     cust_df = pd.DataFrame(cust_res.data) if cust_res.data else pd.DataFrame(columns=['id', 'name'])
     df = sales_df.merge(cust_df, left_on='cust_id', right_on='id', how='left')
@@ -139,113 +146,107 @@ def display_report(sales_df):
     df['day_str'] = df['s_date_dt'].dt.strftime('%Y-%m-%d')
     df = df.sort_values('s_date', ascending=True)
     unique_trans = df.groupby(['day_str', 's_date']).agg({'final_item_price': 'sum', 'method': 'first'}).reset_index()
-    unique_trans['#'] = unique_trans.groupby('day_str').cumcount() + 1
-    df = df.merge(unique_trans[['s_date', '#']], on='s_date')
+    unique_trans['?????'] = unique_trans.groupby('day_str').cumcount() + 1
+    df = df.merge(unique_trans[['s_date', '?????']], on='s_date')
     m_df, k_df = unique_trans[unique_trans['method'] == '???????'], unique_trans[unique_trans['method'] == '?????']
     cols = st.columns(5)
-    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>??????? ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>????? ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>????Ω????</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>????</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
-    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>?????? ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>?? ??????? ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>?? ????? ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>?? ????Ω??</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+    cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>?? ???????</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
+    cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>? ?????? ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     for day, day_data in df.groupby('day_str', sort=True):
         st.subheader(f"?? {datetime.strptime(day, '%Y-%m-%d').strftime('%d/%m/%Y')}")
-        st.dataframe(day_data[['#', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', '???????']].sort_values('#', ascending=True), use_container_width=True, hide_index=True)
+        st.dataframe(day_data[['?????', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', '???????']].sort_values('?????', ascending=True), use_container_width=True, hide_index=True)
 
 # --- 4. MAIN UI ---
 if st.session_state.is_logged_out:
-    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>?π????????????</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>????? ?π????????? ?π??????</h1>", unsafe_allow_html=True)
     if st.button("?π??????????"):
         st.session_state.is_logged_out = False
         st.rerun()
-else:
-    with st.sidebar:
-        now = get_athens_now()
-        st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.55")
-        view = st.radio("?????", ["?? ??????", "?? MANAGER", "?? ???????", "?? ???????"])
-        if st.button("? ??????", key="logout_btn", use_container_width=True): 
-            st.session_state.cart = []
-            st.session_state.selected_cust_id = None
-            st.session_state.is_logged_out = True
-            st.rerun()
+    st.stop()
 
-    if view == "?? ??????":
-        st.markdown(f"<div class='status-header'>???????: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
-        cl, cr = st.columns([1, 1.5])
-        with cl:
-            if st.session_state.selected_cust_id is None:
-                ph = st.text_input("???????? ??????", placeholder="----------", key=f"ph_{st.session_state.ph_key}")
-                if ph:
-                    clean_ph = "".join(filter(str.isdigit, ph))
-                    if len(clean_ph) == 10:
-                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
-                        if res.data: 
-                            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
-                            st.rerun()
-                        else: new_customer_popup(clean_ph)
-                    elif len(clean_ph) > 0:
+with st.sidebar:
+    now = get_athens_now()
+    st.markdown(f"<div class='sidebar-date'>?? {now.strftime('%d/%m/%Y')}<br>?? {now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
+    st.title("CHERRY 14.0.19")
+    view = st.radio("?????", ["?? ??????", "?? MANAGER", "?? ???????", "?? ???????"])
+    if st.button("? ??????", key="logout_btn", use_container_width=True): 
+        st.session_state.cart = []
+        st.session_state.selected_cust_id = None
+        st.session_state.is_logged_out = True
+        st.rerun()
+
+if view == "?? ??????":
+    st.markdown(f"<div class='status-header'>???????: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+    cl, cr = st.columns([1, 1.5])
+    with cl:
+        if st.session_state.selected_cust_id is None:
+            ph = st.text_input("???????? ??????", key=f"ph_{st.session_state.ph_key}")
+            if ph:
+                res = supabase.table("customers").select("*").eq("phone", ph.strip()).execute()
+                if res.data: 
+                    st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
+                    st.rerun()
+                else: new_customer_popup(ph.strip())
+            if st.button("?? ???????", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
+        else:
+            st.button(f"?? {st.session_state.cust_name} (??????)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "??????? ??????"}), use_container_width=True)
+            bc = st.text_input("?????? Barcode", key=f"bc_{st.session_state.bc_key}")
+            if bc:
+                if bc.strip() == "999": manual_item_popup()
+                else:
+                    res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
+                    if res.data:
+                        item = res.data[0]
+                        st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                        st.session_state.bc_key += 1; st.rerun()
+                    else: 
                         play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                        st.error("?π????????? 10 ?????!")
-                if st.button("?? ??????? ?Ω????", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
-            else:
-                st.button(f"?? {st.session_state.cust_name} (??????)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "??????? ??????"}), use_container_width=True)
-                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
-                if bc:
-                    if bc.strip() == "999": manual_item_popup()
-                    else:
-                        res = supabase.table("inventory").select("*").eq("barcode", bc.strip()).execute()
-                        if res.data:
-                            item = res.data[0]
-                            st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                            st.session_state.bc_key += 1; st.rerun()
-                        else: 
-                            play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                            st.error("Barcode ??? ???????!")
-                
-                for idx, item in enumerate(st.session_state.cart):
-                    if st.button(f"? {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
-                        st.session_state.cart.pop(idx); st.rerun()
-                
-                if st.session_state.cart and st.button("?? ????Ω??", use_container_width=True): payment_popup()
-            if st.button("? ????Ω??", use_container_width=True): reset_app()
-        with cr:
-            total = sum(i['price'] for i in st.session_state.cart)
-            lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
-            st.markdown(f"<div class='cart-area'>{'?????':<20} | {'????':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+                        st.error("Barcode ??? ???????!")
+            for idx, item in enumerate(st.session_state.cart):
+                if st.button(f"? {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
+                    st.session_state.cart.pop(idx); st.rerun()
+            if st.session_state.cart and st.button("?? ????Ω??", use_container_width=True): payment_popup()
+        if st.button("??? ????Ω??", use_container_width=True): reset_app()
+    with cr:
+        total = sum(i['price'] for i in st.session_state.cart)
+        lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
+        st.markdown(f"<div class='cart-area'>{'?????':<20} | {'????':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
-    elif view == "?? MANAGER":
-        res_all = supabase.table("sales").select("*").execute()
-        if res_all.data:
-            full_df = pd.DataFrame(res_all.data)
-            full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
-            t1, t2 = st.tabs(["??????", "????????"])
-            with t1: display_report(full_df[full_df['s_date_dt'].dt.date == get_athens_now().date()])
-            with t2:
-                c1, c2 = st.columns(2)
-                d_s, d_e = c1.date_input("?π?:", get_athens_now().date() - timedelta(days=7)), c2.date_input("???:", get_athens_now().date())
-                display_report(full_df[(full_df['s_date_dt'].dt.date >= d_s) & (full_df['s_date_dt'].dt.date <= d_e)])
+elif view == "?? MANAGER":
+    res_all = supabase.table("sales").select("*").execute()
+    if res_all.data:
+        full_df = pd.DataFrame(res_all.data)
+        full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
+        t1, t2 = st.tabs(["??????", "????????"])
+        with t1: display_report(full_df[full_df['s_date_dt'].dt.date == get_athens_now().date()])
+        with t2:
+            c1, c2 = st.columns(2)
+            d_s, d_e = c1.date_input("?π?:", get_athens_now().date() - timedelta(days=7)), c2.date_input("???:", get_athens_now().date())
+            display_report(full_df[(full_df['s_date_dt'].dt.date >= d_s) & (full_df['s_date_dt'].dt.date <= d_e)])
 
-    elif view == "?? ???????":
-        st.subheader("?????????? ?????")
-        with st.form("inv_form", clear_on_submit=True):
-            c1, c2, c3, c4 = st.columns(4)
-            b, n, p, s = c1.text_input("Barcode"), c2.text_input("?????"), c3.number_input("????", step=0.1), c4.number_input("Stock", step=1)
-            if st.form_submit_button("??????????"):
-                if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-        res = supabase.table("inventory").select("*").execute()
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-            if st.button("????????", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
+elif view == "?? ???????":
+    st.subheader("?? ?π?????")
+    with st.form("inv_form", clear_on_submit=True):
+        c1, c2, c3, c4 = st.columns(4)
+        b, n, p, s = c1.text_input("Barcode"), c2.text_input("?????"), c3.number_input("????", step=0.1), c4.number_input("Stock", step=1)
+        if st.form_submit_button("??????????"):
+            if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
+    res = supabase.table("inventory").select("*").execute()
+    for row in res.data:
+        st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
+        if st.button("????????", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
 
-    elif view == "?? ???????":
-        st.subheader("???????????")
-        with st.form("c_form", clear_on_submit=True):
-            cn, cp = st.text_input("?????"), st.text_input("????????")
-            if st.form_submit_button("????????"):
-                if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-        res = supabase.table("customers").select("*").execute()
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>?? {row['name']} | ?? {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("????????", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+elif view == "?? ???????":
+    st.subheader("?? ???????")
+    with st.form("c_form", clear_on_submit=True):
+        cn, cp = st.text_input("?????"), st.text_input("????????")
+        if st.form_submit_button("????????"):
+            if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
+    res = supabase.table("customers").select("*").execute()
+    for row in res.data:
+        st.markdown(f"<div class='data-row'>?? {row['name']} | ?? {row['phone']}</div>", unsafe_allow_html=True)
+        if st.button("????????", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
