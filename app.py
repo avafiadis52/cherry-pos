@@ -7,7 +7,14 @@ import streamlit as st
 import re
 from supabase import create_client, Client
 
-# --- 1. SUPABASE SETUP ---
+# --- 1. EXPERIMENTAL COMPONENT LOAD ---
+try:
+    from streamlit_mic_recorder import speech_to_text
+    HAS_MIC = True
+except ImportError:
+    HAS_MIC = False
+
+# --- 2. SUPABASE SETUP ---
 SUPABASE_URL = "https://hnwynihjkdkryrfepenh.supabase.co"
 SUPABASE_KEY = "sb_publishable_ualF72lJKgUQA4TzjPQ-OA_zih7zJ-s"
 
@@ -17,25 +24,32 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 2. CONFIG & STYLE ---
+# --- 3. CONFIG & STYLE ---
 st.set_page_config(page_title="CHERRY v14.0.63", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
+    
+    /* Dialog Specific Styling from Image */
+    div[data-testid="stDialog"] label p, 
+    div[data-testid="stDialog"] h3, 
+    div[data-testid="stDialog"] .stMarkdown p { color: #111111 !important; }
+    
     input { color: #000000 !important; font-weight: bold !important; }
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
+    
+    /* Reporting Styles */
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     .report-stat { background-color: #262730; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 5px; }
     .grand-stat { background-color: #1e272e; border: 2px solid #2ecc71; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
     .stat-val { font-size: 20px; font-weight: bold; color: #2ecc71; margin: 0; }
-    .stat-val-disc { font-size: 20px; font-weight: bold; color: #e74c3c; margin: 0; }
     .stat-label { font-size: 11px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     .day-title { color: #f1c40f; font-size: 22px; font-weight: bold; border-bottom: 2px solid #f1c40f; margin-top: 30px; margin-bottom: 15px; padding-bottom: 5px; }
     </style>
@@ -49,7 +63,7 @@ if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 
-# --- 3. FUNCTIONS ---
+# --- 4. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
@@ -103,7 +117,7 @@ def finalize(method):
         st.success(f"✅ Η ΠΛΗΡΩΜΗ ({method}) ΟΛΟΚΛΗΡΩΘΗΚΕ"); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1); reset_app()
     except Exception as e: st.error(f"❌ Σφάλμα: {e}")
 
-# --- 4. MAIN UI ---
+# --- 5. MAIN UI ---
 if st.session_state.get('is_logged_out', False):
     st.markdown("<h1 style='text-align: center; color: #e74c3c;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
     if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
@@ -167,14 +181,12 @@ else:
                 group_col = 'action_id' if 'action_id' in df.columns and df['action_id'].notnull().any() else 's_date'
                 m_df, k_df = df[df['method'] == 'Μετρητά'], df[df['method'] == 'Κάρτα']
                 m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
-                d_sum = df['discount'].sum() if 'discount' in df.columns else 0.0
                 m_count, k_count = m_df[group_col].nunique(), k_df[group_col].nunique()
                 
-                c1, c2, c3, c4 = st.columns(4)
+                c1, c2, c3 = st.columns(3)
                 c1.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c2.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΕΚΠΤΩΣΗ</p><p class='stat-val-disc'>{d_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c4.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{m_sum+k_sum:.2f}€</p></div>", unsafe_allow_html=True)
+                c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{m_sum+k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 
                 day_df = df.sort_values('s_date', ascending=True).copy()
                 mapping = {v: i+1 for i, v in enumerate(day_df[group_col].unique())}
