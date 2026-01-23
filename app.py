@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.82", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.83", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -53,7 +53,6 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'last_speech' not in st.session_state: st.session_state.last_speech = None
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 500
 
 # --- 4. FUNCTIONS ---
@@ -129,13 +128,13 @@ def finalize(disc_val, method):
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 # --- 5. MAIN UI ---
-if st.session_state.is_logged_out:
+if st.session_state.get('is_logged_out', False):
     st.markdown("<h1 style='text-align: center; color: #e74c3c;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
     if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.82")
+        st.title("CHERRY 14.0.83")
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True): st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
@@ -178,4 +177,55 @@ else:
             all_df['date_only'] = all_df['s_date_dt'].dt.date
             
             def render_day_report(df, date_label):
-                st.markdown(f"<div class='day
+                st.markdown(f"""<div class='day-title'>📅 Ημερομηνία: {date_label}</div>""", unsafe_allow_html=True)
+                group_col = 'action_id' if 'action_id' in df.columns and df['action_id'].notnull().any() else 's_date'
+                m_df, k_df = df[df['method'] == 'Μετρητά'], df[df['method'] == 'Κάρτα']
+                m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
+                d_sum = df['discount'].sum()
+                m_count, k_count = m_df[group_col].nunique(), k_df[group_col].nunique()
+                
+                c1, c2, c3, c4 = st.columns(4)
+                c1.markdown(f"""<div class='report-stat'><p class='stat-label'>Μετρητά ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                c2.markdown(f"""<div class='report-stat'><p class='stat-label'>Κάρτα ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                c3.markdown(f"""<div class='report-stat'><p class='stat-label'>Έκπτωση</p><p class='stat-val-disc'>{d_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                c4.markdown(f"""<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val'>{m_sum+k_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                
+                day_df = df.sort_values('s_date', ascending=True).copy()
+                mapping = {v: i+1 for i, v in enumerate(day_df[group_col].unique())}
+                day_df['ΠΡΑΞΗ'] = day_df[group_col].map(mapping)
+                disp = day_df.rename(columns={'s_date':'Ημ/νία','item_name':'Είδος','unit_price':'Αρχική','discount':'Έκπτωση','final_item_price':'Τελική','method':'Τρόπος'})
+                st.dataframe(disp.sort_values(['ΠΡΑΞΗ', 'Ημ/νία'], ascending=[False, False])[['ΠΡΑΞΗ', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Τρόπος']], use_container_width=True, hide_index=True)
+
+            with t1:
+                today = get_athens_now().date()
+                render_day_report(all_df[all_df['date_only'] == today].copy(), today.strftime('%d/%m/%Y'))
+                
+            with t2:
+                c1, c2 = st.columns(2)
+                d_f, d_t = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
+                period_df = all_df[(all_df['date_only'] >= d_f) & (all_df['date_only'] <= d_t)].copy()
+                
+                if not period_df.empty:
+                    st.markdown("### 🏆 ΓΕΝΙΚΑ ΣΥΝΟΛΑ ΠΕΡΙΟΔΟΥ")
+                    g_m_sum = period_df[period_df['method'] == 'Μετρητά']['final_item_price'].sum()
+                    g_k_sum = period_df[period_df['method'] == 'Κάρτα']['final_item_price'].sum()
+                    g_d_sum = period_df['discount'].sum()
+                    
+                    gc1, gc2, gc3, gc4 = st.columns(4)
+                    gc1.markdown(f"""<div class='grand-stat'><p class='stat-label'>ΣΥΝΟΛΟ ΜΕΤΡΗΤΑ</p><p class='stat-val' style='font-size:24px;'>{g_m_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                    gc2.markdown(f"""<div class='grand-stat'><p class='stat-label'>ΣΥΝΟΛΟ ΚΑΡΤΑ</p><p class='stat-val' style='font-size:24px;'>{g_k_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                    gc3.markdown(f"""<div class='grand-stat' style='border-color:#e74c3c;'><p class='stat-label'>ΣΥΝΟΛΟ ΕΚΠΤΩΣΗΣ</p><p class='stat-val-disc' style='font-size:24px;'>{g_d_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                    gc4.markdown(f"""<div class='grand-stat' style='border-color:#3498db;'><p class='stat-label'>ΓΕΝΙΚΟ ΣΥΝΟΛΟ</p><p class='stat-val' style='font-size:24px; color:#3498db;'>{g_m_sum+g_k_sum:.2f}€</p></div>""", unsafe_allow_html=True)
+                    st.divider()
+
+                    days = sorted(period_df['date_only'].unique(), reverse=True)
+                    for d in days:
+                        render_day_report(period_df[period_df['date_only'] == d].copy(), d.strftime('%d/%m/%Y'))
+                else:
+                    st.info("Δεν βρέθηκαν πωλήσεις.")
+
+    elif view == "📦 ΑΠΟΘΗΚΗ":
+        with st.form("inv_f", clear_on_submit=True):
+            c1, c2, c3, c4 = st.columns(4)
+            b, n, p, s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
+            if st.form_submit
