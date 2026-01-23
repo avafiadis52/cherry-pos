@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.56", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -174,11 +174,11 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.55")
+        st.title("CHERRY 14.0.56")
         
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input_unique')
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input_v56')
             if text and text != st.session_state.last_speech:
                 st.session_state.last_speech = text
                 cmd = text.lower().strip()
