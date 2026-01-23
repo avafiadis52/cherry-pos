@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.61", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.62", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -138,23 +138,31 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.61")
+        st.title("CHERRY 14.0.62")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
                 st.session_state.last_speech = text
                 cmd = text.lower().strip()
+                # Έλεγχος Αποθήκης
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     item = res.data[0]
                     st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                    st.rerun()
                 else:
+                    # Έλεγχος για Ελεύθερο Είδος (Τιμή)
                     nums = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
                     if nums:
                         price = float(nums[0])
                         name = cmd.replace(str(nums[0]), "").replace("ευρώ", "").strip() or "Ελεύθερο Είδος"
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                st.rerun()
+                        st.rerun()
+                    else:
+                        # Αν δεν κατάλαβε τίποτα
+                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+                        st.warning("Συγγνώμη, δεν κατάλαβα")
+        
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -183,7 +191,6 @@ else:
                             st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
                             st.session_state.bc_key += 1; st.rerun()
                         else: 
-                            # Άμεση πυροδότηση ήχου πριν το μήνυμα σφάλματος
                             play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                             st.error("Barcode δεν υπάρχει!")
                 for idx, item in enumerate(st.session_state.cart):
