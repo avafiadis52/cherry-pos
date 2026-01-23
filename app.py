@@ -174,7 +174,7 @@ else:
         
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_pos_v2')
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_pos_fixed')
             if text:
                 cmd = text.lower().strip()
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
@@ -259,6 +259,23 @@ else:
         st.subheader("Διαχείριση Ειδών")
         with st.form("inv_form", clear_on_submit=True):
             c1, c2, c3, c4 = st.columns(4)
-            b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.1), c4.number_input("Stock", step=1)
+            b_in, n_in, p_in, s_in = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.1), c4.number_input("Stock", step=1)
             if st.form_submit_button("Αποθήκευση"):
-                if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "
+                if b_in and n_in: 
+                    supabase.table("inventory").upsert({"barcode": b_in, "name": n_in, "price": p_in, "stock": s_in}).execute()
+                    st.rerun()
+        res = supabase.table("inventory").select("*").execute()
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
+            if st.button("Διαγραφή", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
+
+    elif view == "👥 ΠΕΛΑΤΕΣ":
+        st.subheader("Πελατολόγιο")
+        with st.form("c_form", clear_on_submit=True):
+            cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
+            if st.form_submit_button("Προσθήκη"):
+                if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
+        res = supabase.table("customers").select("*").execute()
+        for row in res.data:
+            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
+            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
