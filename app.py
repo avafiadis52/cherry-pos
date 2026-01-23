@@ -98,7 +98,7 @@ def new_customer_popup(phone=""):
 @st.dialog("💰 Πληρωμή")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align:center; color: #111;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
     opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
     disc = 0.0
     if opt == "ΝΑΙ":
@@ -172,20 +172,17 @@ else:
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
         st.title("CHERRY 14.0.55")
         
-        # --- ΠΡΟΣΘΗΚΗ ΦΩΝΗΤΙΚΗΣ ΕΝΤΟΛΗΣ (ΜΙΑ ΜΟΝΟ ΑΛΛΑΓΗ) ---
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_pos')
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_pos_v2')
             if text:
                 cmd = text.lower().strip()
-                # 1. Έλεγχος στην αποθήκη
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     item = res.data[0]
                     st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                     st.toast(f"➕ {item['name']}")
                 else:
-                    # 2. Ελεύθερο Είδος αν περιέχει αριθμό
                     numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
                     if numbers:
                         price = float(numbers[0])
@@ -193,7 +190,6 @@ else:
                         if not name: name = "Ελεύθερο Είδος"
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
                         st.toast(f"✅ {name}: {price}€")
-        # --------------------------------------------------
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", key="logout_btn", use_container_width=True): 
@@ -265,19 +261,4 @@ else:
             c1, c2, c3, c4 = st.columns(4)
             b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.1), c4.number_input("Stock", step=1)
             if st.form_submit_button("Αποθήκευση"):
-                if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-        res = supabase.table("inventory").select("*").execute()
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
-
-    elif view == "👥 ΠΕΛΑΤΕΣ":
-        st.subheader("Πελατολόγιο")
-        with st.form("c_form", clear_on_submit=True):
-            cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
-            if st.form_submit_button("Προσθήκη"):
-                if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-        res = supabase.table("customers").select("*").execute()
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+                if b and n: supabase.table("inventory").upsert({"barcode": b, "name": n, "
