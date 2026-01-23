@@ -125,7 +125,6 @@ else:
 
     if view == "🛒 ΤΑΜΕΙΟ":
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
-        
         if voice_active and HAS_MIC:
             speech = speech_to_text(language='el-GR', start_prompt="🎤 Πες Προϊόν...", key=f"mic_{st.session_state.mic_key}")
             if speech and speech != st.session_state.last_speech:
@@ -161,11 +160,9 @@ else:
                         if res.data:
                             st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
                             play_sound("https://www.soundjay.com/buttons/sounds/button-50.mp3"); st.session_state.bc_key += 1; st.rerun()
-                
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} | {item['price']}€", key=f"del_{idx}", use_container_width=True): 
                         st.session_state.cart.pop(idx); st.rerun()
-                
                 if st.session_state.cart and st.button("💳 ΤΑΜΕΙΟ", use_container_width=True): payment_popup()
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         
@@ -182,47 +179,25 @@ else:
             all_df = pd.DataFrame(res.data)
             all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
             all_df['date_only'] = all_df['s_date_dt'].dt.date
-            
-            def render_day_report(df, date_label):
-                st.markdown(f"<div class='day-title'>📅 Ημερομηνία: {date_label}</div>", unsafe_allow_html=True)
-                group_col = 'action_id' if 'action_id' in df.columns and df['action_id'].notnull().any() else 's_date'
+            def r_rep(df, label):
+                st.markdown(f"<div class='day-title'>📅 Ημερομηνία: {label}</div>", unsafe_allow_html=True)
+                gc = 'action_id' if 'action_id' in df.columns else 's_date'
                 m_df, k_df = df[df['method'] == 'Μετρητά'], df[df['method'] == 'Κάρτα']
-                m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
-                d_sum = df['discount'].sum() if 'discount' in df.columns else 0.0
-                m_count, k_count = m_df[group_col].nunique(), k_df[group_col].nunique()
-                
-                c1, c2, c3, c4 = st.columns(4)
-                c1.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c2.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΕΚΠΤΩΣΗ</p><p class='stat-val-disc'>{d_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c4.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{m_sum+k_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                
+                ms, ks = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
+                mc, kc = m_df[gc].nunique(), k_df[gc].nunique()
+                c1, c2, c3 = st.columns(3)
+                c1.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ ({mc})</p><p class='stat-val'>{ms:.2f}€</p></div>", unsafe_allow_html=True)
+                c2.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ ({kc})</p><p class='stat-val'>{ks:.2f}€</p></div>", unsafe_allow_html=True)
+                c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{ms+ks:.2f}€</p></div>", unsafe_allow_html=True)
                 day_df = df.sort_values('s_date', ascending=True).copy()
-                mapping = {v: i+1 for i, v in enumerate(day_df[group_col].unique())}
-                day_df['ΠΡΑΞΗ'] = day_df[group_col].map(mapping)
-                disp = day_df.rename(columns={'s_date':'Ημ/νία','item_name':'Είδος','final_item_price':'Τελική','method':'Τρόπος'})
-                st.dataframe(disp.sort_values(['ΠΡΑΞΗ', 'Ημ/νία'], ascending=[False, False])[['ΠΡΑΞΗ', 'Ημ/νία', 'Είδος', 'Τελική', 'Τρόπος']], use_container_width=True, hide_index=True)
+                map_idx = {v: i+1 for i, v in enumerate(day_df[gc].unique())}
+                day_df['ΠΡΑΞΗ'] = day_df[gc].map(map_idx)
+                st.dataframe(day_df.rename(columns={'s_date':'Ημ/νία','item_name':'Είδος','final_item_price':'Τελική','method':'Τρόπος'}).sort_values(['ΠΡΑΞΗ','Ημ/νία'], ascending=[False, False])[['ΠΡΑΞΗ','Ημ/νία','Είδος','Τελική','Τρόπος']], use_container_width=True, hide_index=True)
 
-            with t1:
-                render_day_report(all_df[all_df['date_only'] == get_athens_now().date()].copy(), "Σήμερα")
+            with t1: r_rep(all_df[all_df['date_only'] == get_athens_now().date()].copy(), "Σήμερα")
             with t2:
                 c1, c2 = st.columns(2)
-                d_f, d_t = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
-                p_df = all_df[(all_df['date_only'] >= d_f) & (all_df['date_only'] <= d_t)].copy()
+                df, dt = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
+                p_df = all_df[(all_df['date_only'] >= df) & (all_df['date_only'] <= dt)].copy()
                 if not p_df.empty:
-                    gm, gk = p_df[p_df['method'] == 'Μετρητά']['final_item_price'].sum(), p_df[p_df['method'] == 'Κάρτα']['final_item_price'].sum()
-                    gc1, gc2, gc3 = st.columns(3)
-                    gc1.markdown(f"<div class='grand-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ</p><p class='stat-val'>{gm:.2f}€</p></div>", unsafe_allow_html=True)
-                    gc2.markdown(f"<div class='grand-stat'><p class='stat-label'>ΚΑΡΤΑ</p><p class='stat-val'>{gk:.2f}€</p></div>", unsafe_allow_html=True)
-                    gc3.markdown(f"<div class='grand-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{gm+gk:.2f}€</p></div>", unsafe_allow_html=True)
-                    days = sorted(p_df['date_only'].unique(), reverse=True)
-                    for d in days: render_day_report(p_df[p_df['date_only'] == d].copy(), d.strftime('%d/%m/%Y'))
-
-    elif view == "📦 ΑΠΟΘΗΚΗ":
-        with st.form("inv_f", clear_on_submit=True):
-            c1, c2, c3, c4 = st.columns(4)
-            b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
-            if st.form_submit_button("➕ Προσθήκη"):
-                supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-        for r in supabase.table("inventory").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ |
+                    gm, gk = p_df[p_df['method'] == 'Μετρητά']['final_item_price'].sum(), p_
