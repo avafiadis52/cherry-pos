@@ -3,10 +3,15 @@ from datetime import datetime, date, timedelta
 import time
 import streamlit as st
 from supabase import create_client, Client
-# Εισαγωγή του ειδικού component για το μικρόφωνο
-from streamlit_mic_recorder import speech_to_text
 
-# --- 1. SUPABASE SETUP ---
+# --- 1. EXPERIMENTAL COMPONENT LOAD ---
+try:
+    from streamlit_mic_recorder import speech_to_text
+    HAS_MIC = True
+except ImportError:
+    HAS_MIC = False
+
+# --- 2. SUPABASE SETUP ---
 SUPABASE_URL = "https://hnwynihjkdkryrfepenh.supabase.co"
 SUPABASE_KEY = "sb_publishable_ualF72lJKgUQA4TzjPQ-OA_zih7zJ-s"
 
@@ -16,8 +21,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.60", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE ---
+st.set_page_config(page_title="CHERRY v14.0.61", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -40,7 +45,7 @@ if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 
-# --- 3. FUNCTIONS ---
+# --- 4. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
@@ -52,38 +57,34 @@ def reset_app():
     st.session_state.ph_key += 1
     st.rerun()
 
-def play_sound(url):
-    st.components.v1.html(f"""<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>""", height=0)
-
-# --- 4. MAIN UI ---
+# --- 5. MAIN UI ---
 if st.session_state.is_logged_out:
     st.markdown("<h1 style='text-align: center;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
     if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.60")
+        st.title("CHERRY 14.0.61")
         
-        # --- ΦΩΝΗΤΙΚΕΣ ΕΝΤΟΛΕΣ (EXPERIMENTAL) ---
-        st.write("🎤 Φωνητικός Έλεγχος")
-        text = speech_to_text(language='el', start_prompt="Πατήστε για εντολή", stop_prompt="Στοπ", key='speech')
-        
-        if text:
-            cmd = text.lower()
-            st.info(f"Ακούστηκε: {cmd}")
-            if "διαγραφή" in cmd or "άδειασμα" in cmd:
-                st.session_state.cart = []
-                st.toast("🧹 Το καλάθι άδειασε!")
-            elif "λιανική" in cmd:
-                st.session_state.selected_cust_id = 0
-                st.session_state.cust_name = "Λιανική Πώληση"
-                st.toast("👤 Λιανική Πώληση")
-            elif "ακύρωση" in cmd:
-                reset_app()
+        # --- VOICE CONTROL LOGIC ---
+        if HAS_MIC:
+            st.write("🎤 Φωνητικός Έλεγχος")
+            text = speech_to_text(language='el', start_prompt="Πείτε εντολή", stop_prompt="Τέλος", key='speech')
+            if text:
+                cmd = text.lower()
+                st.info(f"Ακούστηκε: {cmd}")
+                if "διαγραφή" in cmd or "άδειασμα" in cmd:
+                    st.session_state.cart = []
+                    st.toast("🧹 Το καλάθι άδειασε!")
+                elif "λιανική" in cmd:
+                    st.session_state.selected_cust_id = 0
+                    st.session_state.cust_name = "Λιανική Πώληση"
+                    st.toast("👤 Λιανική Πώληση")
+        else:
+            st.warning("⚠️ Πρόσθεσε το 'streamlit-mic-recorder' στο requirements.txt για φωνητικές εντολές.")
 
         st.divider()
         view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-        
         if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True): 
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
