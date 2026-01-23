@@ -39,6 +39,7 @@ st.markdown("""
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     .report-stat { background-color: #262730; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 22px; font-weight: bold; color: #2ecc71; }
+    .stat-desc { font-size: 12px; color: #888; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -105,14 +106,12 @@ def payment_popup():
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
-    # Χρησιμοποιούμε ακριβές timestamp για την ομαδοποίηση (ΠΡΑΞΗ)
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
-            # Αφαιρέθηκε το action_id για να μη χτυπάει σφάλμα η βάση
             data = {
                 "barcode": str(i['bc']), "item_name": str(i['name']), 
                 "unit_price": float(i['price']), "discount": float(d), 
@@ -196,31 +195,50 @@ else:
         if res.data:
             df = pd.DataFrame(res.data)
             df['date'] = pd.to_datetime(df['s_date']).dt.date
-            
-            # Υπολογισμός στήλης ΠΡΑΞΗ βάσει της ημερομηνίας/ώρας (s_date)
-            # Τα είδη που έχουν ακριβώς το ίδιο s_date ανήκουν στην ίδια πράξη
             df = df.sort_values('s_date')
             df['ΠΡΑΞΗ'] = df.groupby('s_date').ngroup() + 1
             
-            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ"])
+            # Υπολογισμοί για Σήμερα
+            today_df = df[df['date'] == get_athens_now().date()]
+            m_today = today_df[today_df['method'] == 'Μετρητά']
+            c_today = today_df[today_df['method'] == 'Κάρτα']
+            
+            count_m_today = m_today['s_date'].nunique()
+            count_c_today = c_today['s_date'].nunique()
+            disc_today = today_df['discount'].sum()
+
+            t1, t2 = st.tabs([
+                f"📅 ΣΗΜΕΡΑ (💵{count_m_today} / 💳{count_c_today})", 
+                "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"
+            ])
+            
             disp_cols = ['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']
 
             with t1:
-                tdf = df[df['date'] == get_athens_now().date()]
-                c1, c2 = st.columns(2)
-                c1.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{tdf[tdf['method']=='Μετρητά']['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                c2.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{tdf[tdf['method']=='Κάρτα']['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                st.dataframe(tdf[disp_cols].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                c1, c2, c3 = st.columns(3)
+                c1.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{count_m_today} πράξεις</div></div>", unsafe_allow_html=True)
+                c2.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{count_c_today} πράξεις</div></div>", unsafe_allow_html=True)
+                c3.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{disc_today:.2f}€</div><div class='stat-desc'>Συνολικό ποσό</div></div>", unsafe_allow_html=True)
+                st.dataframe(today_df[disp_cols].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
             with t2:
                 col1, col2 = st.columns(2)
                 sd, ed = col1.date_input("Από", get_athens_now().date()-timedelta(days=7)), col2.date_input("Έως", get_athens_now().date())
                 pdf = df[(df['date'] >= sd) & (df['date'] <= ed)]
+                
                 if not pdf.empty:
-                    m1, m2, m3 = st.columns(3)
+                    m_pdf = pdf[pdf['method'] == 'Μετρητά']
+                    c_pdf = pdf[pdf['method'] == 'Κάρτα']
+                    count_m_p = m_pdf['s_date'].nunique()
+                    count_c_p = c_pdf['s_date'].nunique()
+                    
+                    st.markdown(f"**Στατιστικά Περιόδου ({count_m_p + count_c_p} συνολικές πράξεις)**")
+                    m1, m2, m3, m4 = st.columns(4)
                     m1.metric("Σύνολο", f"{pdf['final_item_price'].sum():.2f}€")
-                    m2.metric("Μετρητά", f"{pdf[pdf['method']=='Μετρητά']['final_item_price'].sum():.2f}€")
-                    m3.metric("Κάρτα", f"{pdf[pdf['method']=='Κάρτα']['final_item_price'].sum():.2f}€")
+                    m2.metric("Μετρητά", f"{m_pdf['final_item_price'].sum():.2f}€", f"{count_m_p} πρ.")
+                    m3.metric("Κάρτα", f"{c_pdf['final_item_price'].sum():.2f}€", f"{count_c_p} πρ.")
+                    m4.metric("Εκπτώσεις", f"{pdf['discount'].sum():.2f}€", delta_color="inverse")
+                    
                     st.dataframe(pdf[disp_cols].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
@@ -231,9 +249,4 @@ else:
                 supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
         for r in supabase.table("inventory").select("*").execute().data:
             st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif view == "👥 ΠΕΛΑΤΕΣ":
-        for r in supabase.table("customers").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+            if st.button("❌", key=f"inv_{r
