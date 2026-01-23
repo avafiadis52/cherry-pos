@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.72", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.73", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -118,7 +118,6 @@ def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
-    # Χρήση timestamp για ομαδοποίηση των ειδών της ίδιας απόδειξης
     action_id = int(time.time())
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
@@ -146,7 +145,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.72")
+        st.title("CHERRY 14.0.73")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -211,12 +210,19 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 Manager - v14.0.72")
+        st.header("📊 Manager")
         t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΠΕΡΙΟΔΟΥ"])
         
         res = supabase.table("sales").select("*").execute()
         if res.data:
             all_df = pd.DataFrame(res.data)
+            
+            # ΑΣΦΑΛΕΙΑ: Δημιουργία action_id αν λείπει
+            if 'action_id' not in all_df.columns:
+                all_df['action_id'] = all_df.index
+            else:
+                all_df['action_id'] = all_df['action_id'].fillna(all_df.index.to_series())
+
             all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
             
             def render_manager_logic(df):
@@ -224,38 +230,31 @@ else:
                     st.info("Δεν υπάρχουν πωλήσεις.")
                     return
 
-                # Δημιουργία αύξουσας σειράς Πράξης βάση του action_id
+                # Υπολογισμός αύξουσας σειράς Πράξης
                 df = df.sort_values('s_date', ascending=True)
-                unique_actions = df['action_id'].unique()
-                mapping = {val: i+1 for i, val in enumerate(unique_actions)}
+                u_acts = df['action_id'].unique()
+                mapping = {val: i+1 for i, val in enumerate(u_acts)}
                 df['ΠΡΑΞΗ'] = df['action_id'].map(mapping)
                 
                 # Στατιστικά
                 m_df = df[df['method'] == 'Μετρητά']
                 k_df = df[df['method'] == 'Κάρτα']
                 
-                m_sum = m_df['final_item_price'].sum()
-                k_sum = k_df['final_item_price'].sum()
-                t_sum = df['final_item_price'].sum()
-                
-                m_count = m_df['action_id'].nunique()
-                k_count = k_df['action_id'].nunique()
-                t_count = df['action_id'].nunique()
+                m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
+                m_count, k_count = m_df['action_id'].nunique(), k_df['action_id'].nunique()
 
                 c1, c2, c3 = st.columns(3)
                 c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο ({t_count})</p><p class='stat-val'>{t_sum:.2f}€</p></div>", unsafe_allow_html=True)
+                c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο ({m_count + k_count})</p><p class='stat-val'>{m_sum + k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 
-                # Εμφάνιση πίνακα (αντίστροφη σειρά για να είναι οι νέες πράξεις πάνω)
                 st.dataframe(df.sort_values('s_date', ascending=False)[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method']], use_container_width=True)
 
             with t1:
                 render_manager_logic(all_df[all_df['s_date_dt'].dt.date == get_athens_now().date()].copy())
             with t2:
                 c1, c2 = st.columns(2)
-                d_from = c1.date_input("Από", get_athens_now().date())
-                d_to = c2.date_input("Έως", get_athens_now().date())
+                d_from, d_to = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
                 render_manager_logic(all_df[(all_df['s_date_dt'].dt.date >= d_from) & (all_df['s_date_dt'].dt.date <= d_to)].copy())
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
