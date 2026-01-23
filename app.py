@@ -70,6 +70,20 @@ def speak_text(text):
     js = f"<script>var msg=new SpeechSynthesisUtterance('{text}');msg.lang='el-GR';window.speechSynthesis.speak(msg);</script>"
     st.components.v1.html(js, height=0)
 
+def finalize(disc_val, method):
+    sub = sum(i['price'] for i in st.session_state.cart)
+    ratio = disc_val / sub if sub > 0 else 0
+    ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
+    c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
+    try:
+        for i in st.session_state.cart:
+            d = round(i['price'] * ratio, 2)
+            f = round(i['price'] - d, 2)
+            data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
+            supabase.table("sales").insert(data).execute()
+        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1); reset_app()
+    except Exception as e: st.error(f"Σφάλμα: {e}")
+
 @st.dialog("💰 Πληρωμή")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
@@ -89,20 +103,6 @@ def payment_popup():
     c1, c2 = st.columns(2)
     if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
     if c2.button("💳 Κάρτα", use_container_width=True): finalize(disc, "Κάρτα")
-
-def finalize(disc_val, method):
-    sub = sum(i['price'] for i in st.session_state.cart)
-    ratio = disc_val / sub if sub > 0 else 0
-    ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
-    c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
-    try:
-        for i in st.session_state.cart:
-            d = round(i['price'] * ratio, 2)
-            f = round(i['price'] - d, 2)
-            data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
-            supabase.table("sales").insert(data).execute()
-        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1); reset_app()
-    except Exception as e: st.error(f"Σφάλμα: {e}")
 
 # --- 5. MAIN UI ---
 if st.session_state.is_logged_out:
@@ -164,44 +164,47 @@ else:
             df = pd.DataFrame(res.data)
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
-            df = df.sort_values('s_date_dt')
-            df['ΠΡΑΞΗ'] = df.groupby('s_date').ngroup() + 1
             
             today_date = get_athens_now().date()
-            today_df = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date]
             
-            # Υπολογισμοί Σήμερα
-            m_today = today_df[today_df['method'] == 'Μετρητά']
-            c_today = today_df[today_df['method'] == 'Κάρτα']
-            total_today = today_df['final_item_price'].sum()
-            disc_today = today_df['discount'].sum()
-            count_m_t = m_today['s_date'].nunique()
-            count_c_t = c_today['s_date'].nunique()
-
-            t1, t2 = st.tabs([f"📅 ΣΗΜΕΡΑ (💵{count_m_t} / 💳{count_c_t})", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
             
             with t1:
-                st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{total_today:.2f}€</div></div>", unsafe_allow_html=True)
-                c_m, c_c, c_d = st.columns(3)
-                c_m.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{count_m_t} πράξεις</div></div>", unsafe_allow_html=True)
-                c_c.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{count_c_t} πράξεις</div></div>", unsafe_allow_html=True)
-                c_d.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{disc_today:.2f}€</div><div class='stat-desc'>Συνολικό ποσό</div></div>", unsafe_allow_html=True)
-                st.dataframe(today_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                today_df = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
+                if not today_df.empty:
+                    # Αρίθμηση πράξεων ΜΟΝΟ για σήμερα
+                    today_df['ΠΡΑΞΗ'] = today_df.groupby('s_date').ngroup() + 1
+                    
+                    m_today = today_df[today_df['method'] == 'Μετρητά']
+                    c_today = today_df[today_df['method'] == 'Κάρτα']
+                    
+                    st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{today_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                    c_m, c_c, c_d = st.columns(3)
+                    c_m.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{m_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
+                    c_c.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{c_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
+                    c_d.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{today_df['discount'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                    
+                    st.dataframe(today_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                else:
+                    st.info("Δεν υπάρχουν πωλήσεις για σήμερα.")
 
             with t2:
                 col_s, col_e = st.columns(2)
                 sd, ed = col_s.date_input("Από", today_date-timedelta(days=7)), col_e.date_input("Έως", today_date)
-                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)]
+                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt')
+                
                 if not pdf.empty:
+                    # Αρίθμηση πράξεων ΜΟΝΟ για την επιλεγμένη περίοδο
+                    pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
+                    
                     st.subheader("🗓️ Σύνολα ανά Ημέρα")
                     daily_summary = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(
                         Τζίρος=('final_item_price', 'sum'),
                         Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()),
                         Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()),
-                        Εκπτώσεις=('discount', 'sum'),
                         Πράξεις=('s_date', 'nunique')
                     ).sort_index(ascending=False)
-                    st.table(daily_summary.style.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα', 'Εκπτώσεις']))
+                    st.table(daily_summary.style.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα']))
                     
                     st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
