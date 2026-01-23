@@ -40,8 +40,9 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
-    /* Στυλ για τον πράσινο πίνακα */
-    .green-table { color: #2ecc71 !important; font-weight: bold !important; }
+    /* Fix for Table Visibility */
+    table { color: white !important; }
+    thead tr th { color: white !important; background-color: #333 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -193,7 +194,6 @@ else:
                     pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
                     st.subheader("🗓️ Σύνολα ανά Ημέρα")
                     
-                    # Ομαδοποίηση και υπολογισμός
                     daily_summary = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(
                         Τζίρος=('final_item_price', 'sum'),
                         Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()),
@@ -201,11 +201,14 @@ else:
                         Πράξεις=('s_date', 'nunique')
                     ).sort_index(ascending=False)
                     
-                    # Εφαρμογή πράσινου χρώματος και styling στον πίνακα
-                    styled_summary = daily_summary.style.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])\
-                        .set_properties(**{'color': '#2ecc71', 'font-weight': 'bold', 'font-size': '16px'})
-                    
-                    st.table(styled_summary)
+                    # Styling: Μόνο τα νούμερα των χρημάτων πράσινα, τα υπόλοιπα λευκά
+                    def style_daily(styler):
+                        styler.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
+                        styler.set_properties(**{'color': 'white', 'font-weight': 'bold'}, subset=pd.IndexSlice[:, ['Πράξεις']])
+                        styler.set_properties(**{'color': '#2ecc71', 'font-weight': 'bold'}, subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
+                        return styler
+
+                    st.table(style_daily(daily_summary.style))
                     
                     st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
@@ -223,4 +226,4 @@ else:
     elif view == "👥 ΠΕΛΑΤΕΣ":
         for r in supabase.table("customers").select("*").execute().data:
             st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+            if st.button("❌", key=f"c_{r['id']}"): supabase.
