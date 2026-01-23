@@ -40,7 +40,6 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
-    /* Fix for Table Visibility and Colors */
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
     </style>
@@ -68,10 +67,6 @@ def reset_app():
 
 def play_sound(url):
     st.components.v1.html(f'<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>', height=0)
-
-def speak_text(text):
-    js = f"<script>var msg=new SpeechSynthesisUtterance('{text}');msg.lang='el-GR';window.speechSynthesis.speak(msg);</script>"
-    st.components.v1.html(js, height=0)
 
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
@@ -188,13 +183,17 @@ else:
                 if not pdf.empty:
                     pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
                     st.subheader("🗓️ Σύνολα ανά Ημέρα")
-                    daily_sum = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(Τζίρος=('final_item_price','sum'), Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()), Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()), Πράξεις=('s_date', 'nunique')).sort_index(ascending=False)
+                    daily_sum = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(Τζίρος=('final_item_price','sum'), Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()), Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()), Πράξεις=('s_date', 'nunique')).sort_index(ascending=False).reset_index()
+                    
                     def style_daily(styler):
                         styler.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
-                        styler.set_properties(**{'color': 'white', 'font-weight': 'bold'}, subset=pd.IndexSlice[:, ['Πράξεις']])
+                        # Λευκό χρώμα για Ημερομηνία και Πράξεις
+                        styler.set_properties(**{'color': 'white', 'font-weight': 'bold'}, subset=['ΗΜΕΡΟΜΗΝΙΑ', 'Πράξεις'])
+                        # Πράσινο χρώμα για τα ποσά
                         styler.set_properties(**{'color': '#2ecc71', 'font-weight': 'bold'}, subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
                         return styler
-                    st.table(style_daily(daily_sum.style))
+                    
+                    st.table(style_daily(daily_sum.style.hide(axis='index')))
                     st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
