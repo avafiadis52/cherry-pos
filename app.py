@@ -5,7 +5,7 @@ import streamlit as st
 import re
 from supabase import create_client, Client
 
-# --- 1. EXPERIMENTAL COMPONENT LOAD ---
+# --- 1. VOICE COMPONENT ---
 try:
     from streamlit_mic_recorder import speech_to_text
     HAS_MIC = True
@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.63", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.65", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -52,15 +52,15 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'last_speech' not in st.session_state: st.session_state.last_speech = None
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 500
+if 'last_speech' not in st.session_state: st.session_state.last_speech = ""
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 2000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def reset_app():
-    st.session_state.cart, st.session_state.selected_cust_id, st.session_state.last_speech = [], None, None
+    st.session_state.cart, st.session_state.selected_cust_id, st.session_state.last_speech = [], None, ""
     st.session_state.cust_name = "Λιανική Πώληση"
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
@@ -109,16 +109,37 @@ if st.session_state.is_logged_out:
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
+        
+        # --- ENHANCED VOICE COMMAND LOGIC ---
         if HAS_MIC:
-            text = speech_to_text(language='el', start_prompt="🔊 Voice Command", key=f"mic_{st.session_state.mic_key}")
-            if text and text != st.session_state.last_speech:
-                st.session_state.last_speech = text
-                cmd = text.lower().strip()
+            st.write("🎙️ Φωνητική Εντολή:")
+            # Το speech_to_text επιστρέφει το κείμενο όταν σταματήσει η ομιλία
+            spoken_text = speech_to_text(
+                language='el', 
+                start_prompt="🔊 ΠΕΣ ΠΡΟΪΟΝ", 
+                stop_prompt="🛑 ΤΕΛΟΣ", 
+                key=f"mic_{st.session_state.mic_key}"
+            )
+            
+            if spoken_text:
+                cmd = spoken_text.lower().strip()
+                st.info(f"Αναζήτηση για: {cmd}")
+                # Αναζήτηση στην αποθήκη
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     it = res.data[0]
                     st.session_state.cart.append({'bc': it['barcode'], 'name': it['name'], 'price': round(float(it['price']), 2)})
+                    st.toast(f"✅ {it['name']} προστέθηκε!")
+                    # Αλλάζουμε το κλειδί για να επαναφέρουμε το μικρόφωνο σε καθαρή κατάσταση
+                    st.session_state.mic_key += 1
+                    time.sleep(0.5)
                     st.rerun()
+                else:
+                    st.warning(f"❌ Δεν βρέθηκε το '{cmd}'")
+        else:
+            st.error("Το Mic Recorder δεν αναγνωρίζεται.")
+
+        st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -187,9 +208,7 @@ else:
                     
                     def style_daily(styler):
                         styler.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
-                        # Λευκό χρώμα για Ημερομηνία και Πράξεις
                         styler.set_properties(**{'color': 'white', 'font-weight': 'bold'}, subset=['ΗΜΕΡΟΜΗΝΙΑ', 'Πράξεις'])
-                        # Πράσινο χρώμα για τα ποσά
                         styler.set_properties(**{'color': '#2ecc71', 'font-weight': 'bold'}, subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
                         return styler
                     
