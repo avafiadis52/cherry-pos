@@ -40,6 +40,8 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
+    /* Στυλ για τον πράσινο πίνακα */
+    .green-table { color: #2ecc71 !important; font-weight: bold !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -166,15 +168,12 @@ else:
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             
             today_date = get_athens_now().date()
-            
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
             
             with t1:
                 today_df = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
                 if not today_df.empty:
-                    # Αρίθμηση πράξεων ΜΟΝΟ για σήμερα
                     today_df['ΠΡΑΞΗ'] = today_df.groupby('s_date').ngroup() + 1
-                    
                     m_today = today_df[today_df['method'] == 'Μετρητά']
                     c_today = today_df[today_df['method'] == 'Κάρτα']
                     
@@ -183,10 +182,7 @@ else:
                     c_m.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{m_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
                     c_c.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{c_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
                     c_d.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{today_df['discount'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                    
                     st.dataframe(today_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
-                else:
-                    st.info("Δεν υπάρχουν πωλήσεις για σήμερα.")
 
             with t2:
                 col_s, col_e = st.columns(2)
@@ -194,17 +190,22 @@ else:
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt')
                 
                 if not pdf.empty:
-                    # Αρίθμηση πράξεων ΜΟΝΟ για την επιλεγμένη περίοδο
                     pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
-                    
                     st.subheader("🗓️ Σύνολα ανά Ημέρα")
+                    
+                    # Ομαδοποίηση και υπολογισμός
                     daily_summary = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(
                         Τζίρος=('final_item_price', 'sum'),
                         Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()),
                         Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()),
                         Πράξεις=('s_date', 'nunique')
                     ).sort_index(ascending=False)
-                    st.table(daily_summary.style.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα']))
+                    
+                    # Εφαρμογή πράσινου χρώματος και styling στον πίνακα
+                    styled_summary = daily_summary.style.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])\
+                        .set_properties(**{'color': '#2ecc71', 'font-weight': 'bold', 'font-size': '16px'})
+                    
+                    st.table(styled_summary)
                     
                     st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
