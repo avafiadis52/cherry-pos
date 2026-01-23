@@ -23,13 +23,12 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.67", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.68", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
-    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p { color: #111111 !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
@@ -38,7 +37,6 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-    /* Manager v55 Styles */
     .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
@@ -120,12 +118,24 @@ def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
+    # Δημιουργία μοναδικού ID πράξης (Unix timestamp)
+    action_id = int(time.time())
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
-            data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
+            data = {
+                "barcode": str(i['bc']), 
+                "item_name": str(i['name']), 
+                "unit_price": float(i['price']), 
+                "discount": float(d), 
+                "final_item_price": float(f), 
+                "method": str(method), 
+                "s_date": ts, 
+                "cust_id": c_id,
+                "action_id": action_id
+            }
             supabase.table("sales").insert(data).execute()
             if i['bc'] != '999':
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
@@ -146,7 +156,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.67")
+        st.title("CHERRY 14.0.68")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -211,41 +221,49 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 Αναφορές (v14.0.55)")
+        st.header("📊 Αναλυτικές Αναφορές")
         t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΠΕΡΙΟΔΟΥ"])
         
         res = supabase.table("sales").select("*").execute()
         if res.data:
-            full_df = pd.DataFrame(res.data)
-            full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
+            df = pd.DataFrame(res.data)
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
             
-            with t1:
-                today = get_athens_now().date()
-                df = full_df[full_df['s_date_dt'].dt.date == today].copy()
-                if not df.empty:
-                    df = df.sort_values('s_date', ascending=False)
-                    df.insert(0, 'Α/Α', range(1, len(df) + 1))
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά</p><p class='stat-val'>{df[df['method']=='Μετρητά']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-                    c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα</p><p class='stat-val'>{df[df['method']=='Κάρτα']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-                    c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val'>{df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-                    st.dataframe(df[['Α/Α', 's_date', 'item_name', 'final_item_price', 'method']], use_container_width=True)
-                else: st.info("Καμία πώληση σήμερα.")
+            def show_report(data_df):
+                if not data_df.empty:
+                    data_df = data_df.sort_values('s_date', ascending=False)
+                    # Υπολογισμοί
+                    m_total = data_df[data_df['method'] == 'Μετρητά']['final_item_price'].sum()
+                    k_total = data_df[data_df['method'] == 'Κάρτα']['final_item_price'].sum()
+                    d_total = data_df['discount'].sum()
+                    g_total = data_df['final_item_price'].sum()
+                    
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά</p><p class='stat-val'>{m_total:.2f}€</p></div>", unsafe_allow_html=True)
+                    c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα</p><p class='stat-val'>{k_total:.2f}€</p></div>", unsafe_allow_html=True)
+                    c3.markdown(f"<div class='report-stat'><p class='stat-label'>Έκπτωση</p><p class='stat-val' style='color:#e74c3c'>{d_total:.2f}€</p></div>", unsafe_allow_html=True)
+                    c4.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val' style='color:#3498db'>{g_total:.2f}€</p></div>", unsafe_allow_html=True)
+                    
+                    # Στήλες για το DataFrame
+                    out_df = data_df.rename(columns={
+                        'action_id': 'Πράξη',
+                        's_date': 'Ημ/νία',
+                        'item_name': 'Είδος',
+                        'unit_price': 'Αρχική',
+                        'discount': 'Έκπτωση',
+                        'final_item_price': 'Τελική',
+                        'method': 'Πληρωμή'
+                    })
+                    st.dataframe(out_df[['Πράξη', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Πληρωμή']], use_container_width=True)
+                else: st.info("Δεν βρέθηκαν δεδομένα.")
 
+            with t1:
+                show_report(df[df['s_date_dt'].dt.date == get_athens_now().date()])
             with t2:
                 c1, c2 = st.columns(2)
-                d_from = c1.date_input("Από", today)
-                d_to = c2.date_input("Έως", today)
-                df_p = full_df[(full_df['s_date_dt'].dt.date >= d_from) & (full_df['s_date_dt'].dt.date <= d_to)].copy()
-                if not df_p.empty:
-                    df_p = df_p.sort_values('s_date', ascending=False)
-                    df_p.insert(0, 'Α/Α', range(1, len(df_p) + 1))
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά</p><p class='stat-val'>{df_p[df_p['method']=='Μετρητά']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-                    c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα</p><p class='stat-val'>{df_p[df_p['method']=='Κάρτα']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-                    c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val'>{df_p['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-                    st.dataframe(df_p[['Α/Α', 's_date', 'item_name', 'final_item_price', 'method']], use_container_width=True)
-                else: st.info("Δεν βρέθηκαν πωλήσεις.")
+                df_p = df[(df['s_date_dt'].dt.date >= c1.date_input("Από", get_athens_now().date())) & 
+                          (df['s_date_dt'].dt.date <= c2.date_input("Έως", get_athens_now().date()))]
+                show_report(df_p)
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
