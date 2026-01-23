@@ -1,4 +1,4 @@
-# CHERRY POS SYSTEM - VERSION: 14.0.63 (CLEAN)
+# CHERRY POS SYSTEM - VERSION: 14.0.63
 
 import pandas as pd
 from datetime import datetime, date, timedelta
