@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.59", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.60", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -35,9 +35,6 @@ st.markdown("""
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
-    .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
-    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
-    .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
@@ -141,7 +138,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.59")
+        st.title("CHERRY 14.0.60")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -167,7 +164,8 @@ else:
         cl, cr = st.columns([1, 1.5])
         with cl:
             if st.session_state.selected_cust_id is None:
-                ph = st.text_input("Τηλέφωνο Πελάτη", key=f"ph_{st.session_state.ph_key}")
+                # 1) Placeholder με 10 παύλες
+                ph = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_{st.session_state.ph_key}")
                 if ph and len(ph) == 10:
                     res = supabase.table("customers").select("*").eq("phone", ph).execute()
                     if res.data: 
@@ -185,7 +183,10 @@ else:
                         if res.data:
                             st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
                             st.session_state.bc_key += 1; st.rerun()
-                        else: st.error("Δεν βρέθηκε!")
+                        else: 
+                            # 2) Beep αν δεν βρεθεί barcode
+                            play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
+                            st.error("Barcode δεν υπάρχει!")
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True):
                         st.session_state.cart.pop(idx); st.rerun()
@@ -204,17 +205,13 @@ else:
             df = pd.DataFrame(res.data)
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             today_df = df[df['s_date_dt'].dt.date == get_athens_now().date()]
-            if not today_df.empty:
-                st.dataframe(today_df, use_container_width=True)
+            if not today_df.empty: st.dataframe(today_df, use_container_width=True)
             else: st.info("Καμία πώληση σήμερα.")
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
             c1, c2, c3, c4 = st.columns(4)
-            b = c1.text_input("BC")
-            n = c2.text_input("Όνομα")
-            p = c3.number_input("Τιμή", step=0.01)
-            s = c4.number_input("Stock", step=1)
+            b, n, p, s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
             if st.form_submit_button("Προσθήκη") and b and n:
                 supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
         for r in supabase.table("inventory").select("*").execute().data:
