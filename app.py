@@ -22,7 +22,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.63", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.64", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -48,6 +48,17 @@ if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = Fal
 if 'show_payment' not in st.session_state: st.session_state.show_payment = False
 
 # --- 4. FUNCTIONS ---
+def speak(text):
+    """ Δημιουργεί ηχητική απάντηση μέσω του Browser """
+    components_code = f"""
+    <script>
+    var msg = new SpeechSynthesisUtterance('{text}');
+    msg.lang = 'el-GR';
+    window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.components.v1.html(components_code, height=0)
+
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
@@ -103,23 +114,38 @@ if st.session_state.is_logged_out:
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.63")
+        st.title("CHERRY 14.0.64")
         
         if HAS_MIC:
             st.write("🎤 Φωνητικές Εντολές")
-            text = speech_to_text(language='el', start_prompt="Πείτε εντολή", stop_prompt="Τέλος", key='speech_pos')
+            text = speech_to_text(language='el', start_prompt="Πατήστε & Μιλήστε", stop_prompt="Επεξεργασία...", key='speech_v64')
             if text:
                 cmd = text.lower().strip()
                 if "διαγραφή" in cmd or "άδειασμα" in cmd:
                     st.session_state.cart = []
+                    speak("Το καλάθι άδειασε")
                     st.toast("🧹 Το καλάθι άδειασε!")
                 elif "λιανική" in cmd:
                     st.session_state.selected_cust_id = 0
                     st.session_state.cust_name = "Λιανική Πώληση"
+                    speak("Επιλέχθηκε λιανική πώληση")
                     st.toast("👤 Λιανική Πώληση")
                 elif "πληρωμή" in cmd or "ταμείο" in cmd:
-                    if st.session_state.cart: st.session_state.show_payment = True
-                    else: st.warning("Το καλάθι είναι άδειο!")
+                    if st.session_state.cart:
+                        st.session_state.show_payment = True
+                        speak("Άνοιγμα ταμείου")
+                    else:
+                        speak("Το καλάθι είναι άδειο")
+                else:
+                    # Έξυπνη αναζήτηση είδους
+                    res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
+                    if res.data:
+                        item = res.data[0]
+                        st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                        speak(f"Προστέθηκε {item['name']}")
+                        st.toast(f"➕ {item['name']}")
+                    else:
+                        speak("Δεν βρέθηκε το είδος")
 
         st.divider()
         view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
