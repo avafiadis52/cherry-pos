@@ -1,3 +1,7 @@
 streamlit
 pandas
 supabase
+pandas
+streamlit
+supabase
+streamlit-mic-recorder
