@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.75", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.76", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -118,6 +118,7 @@ def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
+    # action_id: Η ταυτότητα της μίας ταμειακής πράξης
     action_id = int(time.time()) 
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
@@ -145,7 +146,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.75")
+        st.title("CHERRY 14.0.76")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -210,13 +211,12 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 Manager - Ιστορικό Πράξεων")
+        st.header("📊 Manager - Αναφορές")
         t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΠΕΡΙΟΔΟΥ"])
         
         res = supabase.table("sales").select("*").execute()
         if res.data:
             all_df = pd.DataFrame(res.data)
-            # Ασφάλεια για action_id
             if 'action_id' not in all_df.columns: all_df['action_id'] = all_df.index
             all_df['action_id'] = all_df['action_id'].fillna(all_df.index.to_series())
             all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
@@ -226,14 +226,17 @@ else:
                     st.info("Δεν υπάρχουν πωλήσεις.")
                     return
 
-                # Ομαδοποίηση και αρίθμηση πράξεων βάσει χρόνου
+                # --- ΛΟΓΙΚΗ ΑΡΙΘΜΗΣΗΣ ΠΡΑΞΗΣ ---
+                # Ταξινομούμε βάσει χρόνου για να βγει σωστά η σειρά
                 df = df.sort_values('s_date', ascending=True)
-                u_acts = df['action_id'].unique()
-                mapping = {val: i+1 for i, val in enumerate(u_acts)}
+                # Βρίσκουμε τα μοναδικά action_id με τη σειρά που εμφανίστηκαν
+                unique_actions = df['action_id'].unique()
+                # Φτιάχνουμε χάρτη: action_id -> αύξων αριθμός (1, 2, 3...)
+                mapping = {act_id: i+1 for i, act_id in enumerate(unique_actions)}
                 df['ΠΡΑΞΗ'] = df['action_id'].map(mapping)
                 
-                # Μετονομασία για εμφάνιση
-                df = df.rename(columns={
+                # Μετονομασία στηλών για την αναφορά
+                df_display = df.rename(columns={
                     's_date': 'Ημ/νία',
                     'item_name': 'Είδος',
                     'unit_price': 'Αρχική',
@@ -243,9 +246,9 @@ else:
                 })
                 
                 # Στατιστικά
-                m_df = df[df['Τρόπος'] == 'Μετρητά']
-                k_df = df[df['Τρόπος'] == 'Κάρτα']
-                m_sum, k_sum = m_df['Τελική'].sum(), k_df['Τελική'].sum()
+                m_df = df[df['method'] == 'Μετρητά']
+                k_df = df[df['method'] == 'Κάρτα']
+                m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
                 m_count, k_count = m_df['action_id'].nunique(), k_df['action_id'].nunique()
 
                 c1, c2, c3 = st.columns(3)
@@ -253,9 +256,9 @@ else:
                 c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο ({m_count + k_count})</p><p class='stat-val'>{m_sum + k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 
-                # Εμφάνιση πίνακα χωρίς το index του Streamlit
+                # Εμφάνιση πίνακα (πιο πρόσφατα πάνω)
                 out_cols = ['ΠΡΑΞΗ', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Τρόπος']
-                st.dataframe(df.sort_values(['ΠΡΑΞΗ', 'Ημ/νία'], ascending=[False, False])[out_cols], use_container_width=True, hide_index=True)
+                st.dataframe(df_display.sort_values(['ΠΡΑΞΗ', 'Ημ/νία'], ascending=[False, False])[out_cols], use_container_width=True, hide_index=True)
 
             with t1:
                 render_manager_logic(all_df[all_df['s_date_dt'].dt.date == get_athens_now().date()].copy())
