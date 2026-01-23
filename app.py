@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.69", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.70", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -37,7 +37,6 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-    /* Manager v19-stable Styles */
     .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
     .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
@@ -146,7 +145,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.69")
+        st.title("CHERRY 14.0.70")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -210,7 +209,7 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 MANAGER - v14.0.19-stable")
+        st.header("📊 MANAGER - v14.0.19 Logic")
         rep_type = st.radio("Τύπος Αναφοράς", ["ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "ΠΕΡΙΟΔΟΥ"], horizontal=True)
         
         target_date_from = get_athens_now().date()
@@ -224,8 +223,12 @@ else:
         res = supabase.table("sales").select("*").execute()
         if res.data:
             df = pd.DataFrame(res.data)
-            df['s_date_dt'] = pd.to_datetime(df['s_date']).dt.date
             
+            # Έλεγχος αν υπάρχει η στήλη action_id, αλλιώς δημιουργία της
+            if 'action_id' not in df.columns:
+                df['action_id'] = "-"
+            
+            df['s_date_dt'] = pd.to_datetime(df['s_date']).dt.date
             mask = (df['s_date_dt'] >= target_date_from) & (df['s_date_dt'] <= target_date_to)
             f_df = df[mask].copy()
             
@@ -242,7 +245,7 @@ else:
                 c3.markdown(f"<div class='report-stat'><p class='stat-label'>Έκπτωση</p><p class='stat-val' style='color:#e74c3c'>{d_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c4.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val' style='color:#3498db'>{t_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 
-                # Logic from v19-stable
+                # Μετονομασία στηλών για εμφάνιση
                 out = f_df.rename(columns={
                     'action_id': 'Πράξη',
                     'item_name': 'Είδος',
@@ -252,6 +255,7 @@ else:
                     'method': 'Τρόπος',
                     's_date': 'Ημ/νία'
                 })
+                # Επιλογή μόνο των στηλών που θέλουμε να δείξουμε
                 st.dataframe(out[['Πράξη', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Τρόπος']], use_container_width=True)
             else: st.info("Δεν βρέθηκαν πωλήσεις.")
 
