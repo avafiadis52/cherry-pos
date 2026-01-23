@@ -22,7 +22,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.61", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.62", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -64,24 +64,36 @@ if st.session_state.is_logged_out:
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.61")
+        st.title("CHERRY 14.0.62")
         
         # --- VOICE CONTROL LOGIC ---
         if HAS_MIC:
             st.write("🎤 Φωνητικός Έλεγχος")
             text = speech_to_text(language='el', start_prompt="Πείτε εντολή", stop_prompt="Τέλος", key='speech')
             if text:
-                cmd = text.lower()
+                cmd = text.lower().strip()
                 st.info(f"Ακούστηκε: {cmd}")
+                
+                # Logic 1: Καθαρισμός
                 if "διαγραφή" in cmd or "άδειασμα" in cmd:
                     st.session_state.cart = []
                     st.toast("🧹 Το καλάθι άδειασε!")
+                
+                # Logic 2: Επιλογή Λιανικής
                 elif "λιανική" in cmd:
                     st.session_state.selected_cust_id = 0
                     st.session_state.cust_name = "Λιανική Πώληση"
                     st.toast("👤 Λιανική Πώληση")
-        else:
-            st.warning("⚠️ Πρόσθεσε το 'streamlit-mic-recorder' στο requirements.txt για φωνητικές εντολές.")
+                
+                # Logic 3: Αναζήτηση είδους με το όνομα
+                else:
+                    res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
+                    if res.data:
+                        item = res.data[0] # Παίρνουμε το πρώτο που ταιριάζει
+                        st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                        st.toast(f"➕ Προστέθηκε: {item['name']}")
+                    else:
+                        st.error(f"Δεν βρέθηκε είδος: {cmd}")
 
         st.divider()
         view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
