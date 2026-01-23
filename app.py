@@ -131,7 +131,6 @@ def finalize(disc_val, method):
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
         
-        # Εδώ προστέθηκε η επιβεβαίωση που ζήτησες
         st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ")
         st.balloons()
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
@@ -180,11 +179,12 @@ else:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input_fixed')
             if text:
                 cmd = text.lower().strip()
+                processed = False
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     item = res.data[0]
                     st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                    st.toast(f"➕ {item['name']}")
+                    processed = True
                 else:
                     numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
                     if numbers:
@@ -192,7 +192,11 @@ else:
                         name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").strip()
                         if not name: name = "Ελεύθερο Είδος"
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                        st.toast(f"✅ {name}: {price}€")
+                        processed = True
+                
+                # ΚΑΘΑΡΙΣΜΟΣ ΜΝΗΜΗΣ ΕΝΤΟΛΗΣ
+                if processed:
+                    st.rerun()
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", key="logout_btn", use_container_width=True): 
