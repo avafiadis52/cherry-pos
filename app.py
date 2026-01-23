@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.83", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.84", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -134,7 +134,7 @@ if st.session_state.get('is_logged_out', False):
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.83")
+        st.title("CHERRY 14.0.84")
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True): st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
@@ -227,5 +227,23 @@ else:
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
             c1, c2, c3, c4 = st.columns(4)
-            b, n, p, s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
-            if st.form_submit
+            b = c1.text_input("BC")
+            n = c2.text_input("Όνομα")
+            p = c3.number_input("Τιμή", step=0.01)
+            s = c4.number_input("Stock", step=1)
+            if st.form_submit_button("Προσθήκη"):
+                if b and n:
+                    supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute()
+                    st.rerun()
+        for r in supabase.table("inventory").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"inv_{r['barcode']}"): 
+                supabase.table("inventory").delete().eq("barcode", r['barcode']).execute()
+                st.rerun()
+
+    elif view == "👥 ΠΕΛΑΤΕΣ":
+        for r in supabase.table("customers").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"c_{r['id']}"): 
+                supabase.table("customers").delete().eq("id", r['id']).execute()
+                st.rerun()
