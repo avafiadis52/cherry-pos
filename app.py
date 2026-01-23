@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.56", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.57", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
@@ -57,6 +57,7 @@ if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 if 'last_speech' not in st.session_state: st.session_state.last_speech = None
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 500
 
 # --- 3. FUNCTIONS ---
 def get_athens_now():
@@ -69,6 +70,7 @@ def reset_app():
     st.session_state.bc_key += 1
     st.session_state.ph_key += 1
     st.session_state.last_speech = None
+    st.session_state.mic_key += 1 # Αλλάζει το κλειδί του μικροφώνου για πλήρη καθαρισμό
     st.rerun()
 
 def play_sound(url):
@@ -136,7 +138,7 @@ def finalize(disc_val, method):
         st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ")
         st.balloons()
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
-        time.sleep(2.0)
+        time.sleep(1.5)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -174,11 +176,12 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.56")
+        st.title("CHERRY 14.0.57")
         
         if HAS_MIC:
             st.write("🎤 Φωνητική Καταχώρηση")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key='voice_input_v56')
+            # Δυναμικό κλειδί mic_key για πλήρη καθαρισμό μετά την πληρωμή
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
                 st.session_state.last_speech = text
                 cmd = text.lower().strip()
@@ -270,16 +273,4 @@ else:
                     st.rerun()
         res = supabase.table("inventory").select("*").execute()
         for row in res.data:
-            st.markdown(f"<div class='data-row'>{row['barcode']} | {row['name']} | {row['price']}€ | Stock: {row['stock']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"inv_{row['barcode']}"): supabase.table("inventory").delete().eq("barcode", row['barcode']).execute(); st.rerun()
-
-    elif view == "👥 ΠΕΛΑΤΕΣ":
-        st.subheader("Πελατολόγιο")
-        with st.form("c_form", clear_on_submit=True):
-            cn, cp = st.text_input("Όνομα"), st.text_input("Τηλέφωνο")
-            if st.form_submit_button("Προσθήκη"):
-                if cn and cp: supabase.table("customers").insert({"name": cn, "phone": cp}).execute(); st.rerun()
-        res = supabase.table("customers").select("*").execute()
-        for row in res.data:
-            st.markdown(f"<div class='data-row'>👤 {row['name']} | 📞 {row['phone']}</div>", unsafe_allow_html=True)
-            if st.button("Διαγραφή", key=f"c_{row['id']}"): supabase.table("customers").delete().eq("id", row['id']).execute(); st.rerun()
+            st.markdown(f"<div class='data
