@@ -38,7 +38,6 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-    /* Reporting Styles */
     .report-stat { background-color: #262730; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 5px; }
     .grand-stat { background-color: #1e272e; border: 2px solid #2ecc71; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
     .stat-val { font-size: 20px; font-weight: bold; color: #2ecc71; margin: 0; }
@@ -134,10 +133,7 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
-        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ")
-        st.balloons()
-        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
-        time.sleep(1.5); reset_app()
+        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1.5); reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 # --- 5. MAIN UI ---
@@ -166,9 +162,7 @@ else:
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
                         st.rerun()
                     else:
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                        speak_text("Δεν κατάλαβα")
-                        st.warning("Συγγνώμη, δεν κατάλαβα")
+                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3"); speak_text("Δεν κατάλαβα"); st.warning("Συγγνώμη, δεν κατάλαβα")
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
@@ -225,12 +219,10 @@ else:
                 m_df, k_df = df[df['method'] == 'Μετρητά'], df[df['method'] == 'Κάρτα']
                 m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
                 m_count, k_count = m_df[group_col].nunique(), k_df[group_col].nunique()
-                
                 c1, c2, c3 = st.columns(3)
                 c1.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c2.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{m_sum+k_sum:.2f}€</p></div>", unsafe_allow_html=True)
-                
                 day_df = df.sort_values('s_date', ascending=True).copy()
                 mapping = {v: i+1 for i, v in enumerate(day_df[group_col].unique())}
                 day_df['ΠΡΑΞΗ'] = day_df[group_col].map(mapping)
@@ -242,22 +234,4 @@ else:
             with t2:
                 c1, c2 = st.columns(2)
                 d_f, d_t = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
-                p_df = all_df[(all_df['date_only'] >= d_f) & (all_df['date_only'] <= d_t)].copy()
-                if not p_df.empty:
-                    gm, gk = p_df[p_df['method'] == 'Μετρητά']['final_item_price'].sum(), p_df[p_df['method'] == 'Κάρτα']['final_item_price'].sum()
-                    gc1, gc2, gc3 = st.columns(3)
-                    gc1.markdown(f"<div class='grand-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ</p><p class='stat-val'>{gm:.2f}€</p></div>", unsafe_allow_html=True)
-                    gc2.markdown(f"<div class='grand-stat'><p class='stat-label'>ΚΑΡΤΑ</p><p class='stat-val'>{gk:.2f}€</p></div>", unsafe_allow_html=True)
-                    gc3.markdown(f"<div class='grand-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{gm+gk:.2f}€</p></div>", unsafe_allow_html=True)
-                    days = sorted(p_df['date_only'].unique(), reverse=True)
-                    for d in days: render_day_report(p_df[p_df['date_only'] == d].copy(), d.strftime('%d/%m/%Y'))
-
-    elif view == "📦 ΑΠΟΘΗΚΗ":
-        with st.form("inv_f", clear_on_submit=True):
-            c1, c2, c3, c4 = st.columns(4)
-            b, n, p, s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
-            if st.form_submit_button("Προσθήκη") and b and n:
-                supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
-        for r in supabase.table("inventory").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"inv_{r['barcode']}"): supabase.
+                p_df = all_df[(all_df['date_only'] >= d_f) & (
