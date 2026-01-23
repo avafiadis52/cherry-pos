@@ -22,8 +22,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.67", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (v14.0.55) ---
+st.set_page_config(page_title="CHERRY v14.0.68", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -48,15 +48,6 @@ if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = Fal
 if 'show_payment' not in st.session_state: st.session_state.show_payment = False
 
 # --- 4. FUNCTIONS ---
-def speak(text):
-    st.components.v1.html(f"""
-    <script>
-    var msg = new SpeechSynthesisUtterance('{text}');
-    msg.lang = 'el-GR';
-    window.speechSynthesis.speak(msg);
-    </script>
-    """, height=0)
-
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
@@ -95,40 +86,32 @@ if st.session_state.is_logged_out:
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.67")
+        st.title("CHERRY 14.0.68")
         
+        # Ενσωμάτωση ΜΟΝΟ της έξυπνης φωνητικής λειτουργίας
         if HAS_MIC:
             st.write("🎤 Φωνητική Είσοδος")
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος & Τιμή", stop_prompt="Τέλος", key='voice_v67')
+            text = speech_to_text(language='el', start_prompt="Πείτε Είδος & Τιμή", stop_prompt="Τέλος", key='voice_input')
             if text:
                 cmd = text.lower().strip()
-                if "διαγραφή" in cmd:
-                    st.session_state.cart = []; speak("Το καλάθι άδειασε")
-                elif "πληρωμή" in cmd:
-                    st.session_state.show_payment = True; speak("Ταμείο")
+                # Εξαγωγή αριθμού για την τιμή
+                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
+                if numbers:
+                    price = float(numbers[0])
+                    name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").replace("euro", "").strip()
+                    if not name: name = "Ελεύθερο Είδος"
+                    st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
+                    st.toast(f"✅ {name}: {price}€")
                 else:
-                    # Έλεγχος για "Είδος + Τιμή" (π.χ. "λάχανο 2 ευρώ" ή "2 ευρώ λάχανο")
-                    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
-                    if numbers:
-                        price = float(numbers[0])
-                        # Αφαιρούμε τους αριθμούς και τις λέξεις "ευρώ", "euro" για να βρούμε το όνομα
-                        name = cmd.replace(str(numbers[0]), "").replace("ευρώ", "").replace("ευρω", "").replace("euro", "").strip()
-                        if not name: name = "Είδος Χειροκίνητο"
-                        
-                        st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                        speak(f"Προστέθηκε {name} με {price} ευρώ")
-                        st.toast(f"✅ {name}: {price}€")
-                    else:
-                        # Αν δεν βρει τιμή, ψάχνει στην αποθήκη
-                        res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
-                        if res.data:
-                            item = res.data[0]
-                            st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                            speak(f"Προστέθηκε {item['name']}")
-                        else: speak("Δεν καταλάβα την τιμή ή το είδος")
+                    # Αναζήτηση στην αποθήκη αν δεν υπάρχει τιμή στη φράση
+                    res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
+                    if res.data:
+                        item = res.data[0]
+                        st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
+                        st.toast(f"➕ {item['name']}")
 
         st.divider()
-        view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ"])
+        view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ ΕΞΟΔΟΣ", use_container_width=True): 
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
@@ -138,6 +121,14 @@ else:
         cl, cr = st.columns([1, 1.5])
         with cl:
             if st.session_state.selected_cust_id is None:
+                ph = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_{st.session_state.ph_key}")
+                if ph:
+                    clean_ph = "".join(filter(str.isdigit, ph))
+                    if len(clean_ph) == 10:
+                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
+                        if res.data: 
+                            st.session_state.selected_cust_id = res.data[0]['id']
+                            st.session_state.cust_name = res.data[0]['name']; st.rerun()
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): 
                     st.session_state.selected_cust_id = 0; st.session_state.cust_name = "Λιανική Πώληση"; st.rerun()
             else:
