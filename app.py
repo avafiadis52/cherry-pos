@@ -165,4 +165,35 @@ else:
                         play_sound("https://www.soundjay.com/buttons/beep-10.mp3"); speak_text("Δεν κατάλαβα"); st.warning("Συγγνώμη, δεν κατάλαβα")
 
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
-        if st.button("❌ Έξοδος",
+        if st.button("❌ Έξοδος", use_container_width=True):
+            st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
+
+    if view == "🛒 ΤΑΜΕΙΟ":
+        st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+        cl, cr = st.columns([1, 1.5])
+        with cl:
+            if st.session_state.selected_cust_id is None:
+                ph = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_{st.session_state.ph_key}")
+                if ph and len(ph) == 10:
+                    res = supabase.table("customers").select("*").eq("phone", ph).execute()
+                    if res.data: 
+                        st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
+                        st.rerun()
+                    else: new_customer_popup(ph)
+                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
+            else:
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+                if bc:
+                    if bc == "999": manual_item_popup()
+                    else:
+                        res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
+                        if res.data:
+                            st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
+                            st.session_state.bc_key += 1; st.rerun()
+                        else: 
+                            play_sound("https://www.soundjay.com/buttons/beep-10.mp3"); st.error("Barcode δεν υπάρχει!")
+                for idx, item in enumerate(st.session_state.cart):
+                    if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True):
+                        st.session_state.cart.pop(idx); st.rerun()
+                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
