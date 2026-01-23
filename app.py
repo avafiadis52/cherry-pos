@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.63", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.64", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -38,6 +38,9 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+    .report-stat { background-color: #262730; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
+    .stat-label { font-size: 13px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -69,14 +72,7 @@ def play_sound(url):
     st.components.v1.html(f'<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>', height=0)
 
 def speak_text(text):
-    """Χρησιμοποιεί το Web Speech API για φωνητική απόκριση"""
-    js_code = f"""
-    <script>
-    var msg = new SpeechSynthesisUtterance('{text}');
-    msg.lang = 'el-GR';
-    window.speechSynthesis.speak(msg);
-    </script>
-    """
+    js_code = f"<script>var msg = new SpeechSynthesisUtterance('{text}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);</script>"
     st.components.v1.html(js_code, height=0)
 
 @st.dialog("➕ Χειροκίνητο Είδος (999)")
@@ -149,20 +145,18 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.63")
+        st.title("CHERRY 14.0.64")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
                 st.session_state.last_speech = text
                 cmd = text.lower().strip()
-                # Έλεγχος Αποθήκης
                 res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
                 if res.data:
                     item = res.data[0]
                     st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                     st.rerun()
                 else:
-                    # Έλεγχος για Τιμή (Ελεύθερο Είδος)
                     nums = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
                     if nums:
                         price = float(nums[0])
@@ -170,11 +164,9 @@ else:
                         st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
                         st.rerun()
                     else:
-                        # Φωνητική και ηχητική ειδοποίηση "Δεν κατάλαβα"
                         play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                         speak_text("Δεν κατάλαβα")
                         st.warning("Συγγνώμη, δεν κατάλαβα")
-
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -217,14 +209,38 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.subheader("Σημερινές Πωλήσεις")
+        st.header("📊 Αναφορές Πωλήσεων")
+        rep_type = st.radio("Τύπος Αναφοράς", ["ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "ΠΕΡΙΟΔΟΥ"], horizontal=True)
+        
+        if rep_type == "ΤΑΜΕΙΟ ΗΜΕΡΑΣ":
+            target_date = get_athens_now().date()
+        else:
+            c1, c2 = st.columns(2)
+            d_from = c1.date_input("Από", get_athens_now().date())
+            d_to = c2.date_input("Έως", get_athens_now().date())
+        
         res = supabase.table("sales").select("*").execute()
         if res.data:
             df = pd.DataFrame(res.data)
-            df['s_date_dt'] = pd.to_datetime(df['s_date'])
-            today_df = df[df['s_date_dt'].dt.date == get_athens_now().date()]
-            if not today_df.empty: st.dataframe(today_df, use_container_width=True)
-            else: st.info("Καμία πώληση σήμερα.")
+            df['s_date_dt'] = pd.to_datetime(df['s_date']).dt.date
+            
+            if rep_type == "ΤΑΜΕΙΟ ΗΜΕΡΑΣ":
+                filtered_df = df[df['s_date_dt'] == target_date]
+            else:
+                filtered_df = df[(df['s_date_dt'] >= d_from) & (df['s_date_dt'] <= d_to)]
+            
+            if not filtered_df.empty:
+                t_cash = filtered_df[filtered_df['method'] == 'Μετρητά']['final_item_price'].sum()
+                t_card = filtered_df[filtered_df['method'] == 'Κάρτα']['final_item_price'].sum()
+                
+                c1, c2, c3 = st.columns(3)
+                c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά</p><p class='stat-val'>{t_cash:.2f}€</p></div>", unsafe_allow_html=True)
+                c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα</p><p class='stat-val'>{t_card:.2f}€</p></div>", unsafe_allow_html=True)
+                c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο</p><p class='stat-val'>{(t_cash + t_card):.2f}€</p></div>", unsafe_allow_html=True)
+                
+                st.dataframe(filtered_df[['s_date', 'item_name', 'final_item_price', 'method']], use_container_width=True)
+            else:
+                st.info("Δεν βρέθηκαν πωλήσεις για την επιλεγμένη περίοδο.")
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
