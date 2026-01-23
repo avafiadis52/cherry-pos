@@ -29,7 +29,6 @@ st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
-    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p { color: #111111 !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
@@ -61,8 +60,8 @@ def play_sound(url):
     st.components.v1.html(f'<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>', height=0)
 
 def speak_text(text):
-    js_code = f"<script>var msg = new SpeechSynthesisUtterance('{text}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);</script>"
-    st.components.v1.html(js_code, height=0)
+    js = f"<script>var msg=new SpeechSynthesisUtterance('{text}');msg.lang='el-GR';window.speechSynthesis.speak(msg);</script>"
+    st.components.v1.html(js, height=0)
 
 @st.dialog("➕ Χειροκίνητο Είδος")
 def manual_item_popup():
@@ -80,8 +79,7 @@ def new_customer_popup(phone=""):
     if st.button("Αποθήκευση", use_container_width=True):
         res = supabase.table("customers").insert({"name": name, "phone": phone_val}).execute()
         if res.data:
-            st.session_state.selected_cust_id = res.data[0]['id']
-            st.session_state.cust_name = res.data[0]['name']
+            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
             st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
 
 @st.dialog("💰 Πληρωμή")
@@ -107,37 +105,37 @@ def payment_popup():
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
+    # Χρησιμοποιούμε ακριβές timestamp για την ομαδοποίηση (ΠΡΑΞΗ)
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
-    # Δημιουργία μοναδικού ID για την πράξη (π.χ. 1705843200)
-    aid = int(time.time())
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
+            # Αφαιρέθηκε το action_id για να μη χτυπάει σφάλμα η βάση
             data = {
                 "barcode": str(i['bc']), "item_name": str(i['name']), 
                 "unit_price": float(i['price']), "discount": float(d), 
                 "final_item_price": float(f), "method": str(method), 
-                "s_date": ts, "cust_id": c_id, "action_id": aid
+                "s_date": ts, "cust_id": c_id
             }
             supabase.table("sales").insert(data).execute()
             if i['bc'] != '999':
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
-        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1.5); reset_app()
+        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1); reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 # --- 5. MAIN UI ---
 if st.session_state.is_logged_out:
-    st.markdown("<h1 style='text-align: center; color: #e74c3c;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center;color:#e74c3c;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
     if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         if HAS_MIC:
-            text = speech_to_text(language='el', start_prompt="🔊 Φωνητική Εντολή", key=f"mic_{st.session_state.mic_key}")
+            text = speech_to_text(language='el', start_prompt="🔊 Voice Command", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
                 st.session_state.last_speech = text
                 cmd = text.lower().strip()
@@ -197,16 +195,14 @@ else:
         res = supabase.table("sales").select("*").execute()
         if res.data:
             df = pd.DataFrame(res.data)
-            # Δημιουργία στήλης ΠΡΑΞΗ από το action_id
-            if 'action_id' in df.columns:
-                df['ΠΡΑΞΗ'] = df.groupby('action_id').ngroup() + 1
-            else:
-                df['ΠΡΑΞΗ'] = "-"
-            
             df['date'] = pd.to_datetime(df['s_date']).dt.date
-            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ"])
             
-            # Επιλογή στηλών προς εμφάνιση (χωρίς το id)
+            # Υπολογισμός στήλης ΠΡΑΞΗ βάσει της ημερομηνίας/ώρας (s_date)
+            # Τα είδη που έχουν ακριβώς το ίδιο s_date ανήκουν στην ίδια πράξη
+            df = df.sort_values('s_date')
+            df['ΠΡΑΞΗ'] = df.groupby('s_date').ngroup() + 1
+            
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ"])
             disp_cols = ['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']
 
             with t1:
