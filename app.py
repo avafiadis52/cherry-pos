@@ -1,3 +1,6 @@
+# CHERRY POS SYSTEM - VERSION: 14.0.90
+# CHANGES: MERGED v14.0.63 STABILITY WITH v14.0.88 REPORTS
+
 import pandas as pd
 from datetime import datetime, date, timedelta
 import time
@@ -23,7 +26,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.63", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.90", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -37,12 +40,9 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000000 !important; border-radius: 8px !important; font-weight: bold !important; }
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-    .report-stat { background-color: #262730; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 5px; }
-    .grand-stat { background-color: #1e272e; border: 2px solid #2ecc71; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
-    .stat-val { font-size: 20px; font-weight: bold; color: #2ecc71; margin: 0; }
-    .stat-val-disc { font-size: 20px; font-weight: bold; color: #e74c3c; margin: 0; }
-    .stat-label { font-size: 11px; color: #888; margin: 0; font-weight: bold; text-transform: uppercase; }
-    .day-title { color: #f1c40f; font-size: 22px; font-weight: bold; border-bottom: 2px solid #f1c40f; margin-top: 30px; margin-bottom: 15px; padding-bottom: 5px; }
+    .report-stat { background-color: #1e272e; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #2ecc71; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; margin: 0; }
+    .stat-label { font-size: 12px; color: #888; font-weight: bold; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -117,7 +117,7 @@ if st.session_state.get('is_logged_out', False):
 else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY v14.0.63")
+        st.title("CHERRY v14.0.90")
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         st.markdown("---")
         voice_active = st.checkbox("🎤 Ενεργοποίηση Φωνής", value=True)
@@ -172,32 +172,32 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 Manager Dashboard")
-        t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΙΣΤΟΡΙΚΟ ΠΕΡΙΟΔΟΥ"])
+        st.header("📊 Αναφορές Πωλήσεων")
         res = supabase.table("sales").select("*").execute()
         if res.data:
-            all_df = pd.DataFrame(res.data)
-            all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
-            all_df['date_only'] = all_df['s_date_dt'].dt.date
-            def r_rep(df, label):
-                st.markdown(f"<div class='day-title'>📅 Ημερομηνία: {label}</div>", unsafe_allow_html=True)
-                gc = 'action_id' if 'action_id' in df.columns else 's_date'
-                m_df, k_df = df[df['method'] == 'Μετρητά'], df[df['method'] == 'Κάρτα']
-                ms, ks = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
-                mc, kc = m_df[gc].nunique(), k_df[gc].nunique()
-                c1, c2, c3 = st.columns(3)
-                c1.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ ({mc})</p><p class='stat-val'>{ms:.2f}€</p></div>", unsafe_allow_html=True)
-                c2.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ ({kc})</p><p class='stat-val'>{ks:.2f}€</p></div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ</p><p class='stat-val'>{ms+ks:.2f}€</p></div>", unsafe_allow_html=True)
-                day_df = df.sort_values('s_date', ascending=True).copy()
-                map_idx = {v: i+1 for i, v in enumerate(day_df[gc].unique())}
-                day_df['ΠΡΑΞΗ'] = day_df[gc].map(map_idx)
-                st.dataframe(day_df.rename(columns={'s_date':'Ημ/νία','item_name':'Είδος','final_item_price':'Τελική','method':'Τρόπος'}).sort_values(['ΠΡΑΞΗ','Ημ/νία'], ascending=[False, False])[['ΠΡΑΞΗ','Ημ/νία','Είδος','Τελική','Τρόπος']], use_container_width=True, hide_index=True)
+            df = pd.DataFrame(res.data)
+            df['date_only'] = pd.to_datetime(df['s_date']).dt.date
+            today_df = df[df['date_only'] == get_athens_now().date()]
+            
+            c1, c2, c3 = st.columns(3)
+            with c1: st.markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ</p><p class='stat-val'>{today_df[today_df['method']=='Μετρητά']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+            with c2: st.markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ</p><p class='stat-val'>{today_df[today_df['method']=='Κάρτα']['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+            with c3: st.markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ ΗΜΕΡΑΣ</p><p class='stat-val'>{today_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
+            
+            st.markdown("### Πρόσφατες Συναλλαγές")
+            st.dataframe(today_df[['s_date', 'item_name', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True)
 
-            with t1: r_rep(all_df[all_df['date_only'] == get_athens_now().date()].copy(), "Σήμερα")
-            with t2:
-                c1, c2 = st.columns(2)
-                df, dt = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
-                p_df = all_df[(all_df['date_only'] >= df) & (all_df['date_only'] <= dt)].copy()
-                if not p_df.empty:
-                    gm, gk = p_df[p_df['method'] == 'Μετρητά']['final_item_price'].sum(), p_
+    elif view == "📦 ΑΠΟΘΗΚΗ":
+        with st.form("inv_f", clear_on_submit=True):
+            c1, c2, c3, c4 = st.columns(4)
+            b, n, p, s = c1.text_input("Barcode"), c2.text_input("Όνομα"), c3.number_input("Τιμή", step=0.01), c4.number_input("Stock", step=1)
+            if st.form_submit_button("➕ Προσθήκη"):
+                supabase.table("inventory").upsert({"barcode": b, "name": n, "price": p, "stock": s}).execute(); st.rerun()
+        for r in supabase.table("inventory").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+            if st.button("🗑️", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif view == "👥 ΠΕΛΑΤΕΣ":
+        for r in supabase.table("customers").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+            if st.button("🗑️", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
