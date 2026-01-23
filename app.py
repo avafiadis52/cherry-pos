@@ -40,7 +40,7 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
-    /* Fix for Table Visibility */
+    /* Fix for Table Visibility and Colors */
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
     </style>
@@ -124,7 +124,6 @@ else:
                     it = res.data[0]
                     st.session_state.cart.append({'bc': it['barcode'], 'name': it['name'], 'price': round(float(it['price']), 2)})
                     st.rerun()
-
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -167,17 +166,14 @@ else:
             df = pd.DataFrame(res.data)
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
-            
             today_date = get_athens_now().date()
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
-            
             with t1:
                 today_df = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
                 if not today_df.empty:
                     today_df['ΠΡΑΞΗ'] = today_df.groupby('s_date').ngroup() + 1
                     m_today = today_df[today_df['method'] == 'Μετρητά']
                     c_today = today_df[today_df['method'] == 'Κάρτα']
-                    
                     st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{today_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                     c_m, c_c, c_d = st.columns(3)
                     c_m.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{m_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
@@ -189,36 +185,23 @@ else:
                 col_s, col_e = st.columns(2)
                 sd, ed = col_s.date_input("Από", today_date-timedelta(days=7)), col_e.date_input("Έως", today_date)
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt')
-                
                 if not pdf.empty:
                     pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
                     st.subheader("🗓️ Σύνολα ανά Ημέρα")
-                    
-                    daily_summary = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(
-                        Τζίρος=('final_item_price', 'sum'),
-                        Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()),
-                        Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()),
-                        Πράξεις=('s_date', 'nunique')
-                    ).sort_index(ascending=False)
-                    
-                    # Styling: Μόνο τα νούμερα των χρημάτων πράσινα, τα υπόλοιπα λευκά
+                    daily_sum = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(Τζίρος=('final_item_price','sum'), Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()), Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()), Πράξεις=('s_date', 'nunique')).sort_index(ascending=False)
                     def style_daily(styler):
                         styler.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
                         styler.set_properties(**{'color': 'white', 'font-weight': 'bold'}, subset=pd.IndexSlice[:, ['Πράξεις']])
                         styler.set_properties(**{'color': '#2ecc71', 'font-weight': 'bold'}, subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
                         return styler
-
-                    st.table(style_daily(daily_summary.style))
-                    
+                    st.table(style_daily(daily_sum.style))
                     st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
-            c1,c2,c3,c4 = st.columns(4)
-            b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή"), c4.number_input("Stock")
-            if st.form_submit_button("Προσθήκη") and b and n:
-                supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
+            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή"), c4.number_input("Stock")
+            if st.form_submit_button("Προσθήκη") and b and n: supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
         for r in supabase.table("inventory").select("*").execute().data:
             st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
             if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
@@ -226,4 +209,4 @@ else:
     elif view == "👥 ΠΕΛΑΤΕΣ":
         for r in supabase.table("customers").select("*").execute().data:
             st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"c_{r['id']}"): supabase.
+            if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
