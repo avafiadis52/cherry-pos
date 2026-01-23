@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.76", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.77", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -118,23 +118,31 @@ def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
-    # action_id: Η ταυτότητα της μίας ταμειακής πράξης
     action_id = int(time.time()) 
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
+    
     try:
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id, "action_id": action_id}
-            supabase.table("sales").insert(data).execute()
+            
+            # Δοκιμή αποθήκευσης με αφαίρεση του action_id αν η στήλη δεν υπάρχει στη βάση
+            try:
+                supabase.table("sales").insert(data).execute()
+            except:
+                data.pop("action_id", None)
+                supabase.table("sales").insert(data).execute()
+
             if i['bc'] != '999':
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
+        
         st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ")
         st.balloons()
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
-        time.sleep(1.5)
+        time.sleep(1)
         reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
@@ -146,29 +154,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.76")
-        if HAS_MIC:
-            text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
-            if text and text != st.session_state.last_speech:
-                st.session_state.last_speech = text
-                cmd = text.lower().strip()
-                res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
-                if res.data:
-                    item = res.data[0]
-                    st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
-                    st.rerun()
-                else:
-                    nums = re.findall(r"[-+]?\d*\.\d+|\d+", cmd.replace(",", "."))
-                    if nums:
-                        price = float(nums[0])
-                        name = cmd.replace(str(nums[0]), "").replace("ευρώ", "").strip() or "Ελεύθερο Είδος"
-                        st.session_state.cart.append({'bc': '999', 'name': name.capitalize(), 'price': price})
-                        st.rerun()
-                    else:
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                        speak_text("Δεν κατάλαβα")
-                        st.warning("Συγγνώμη, δεν κατάλαβα")
-
+        st.title("CHERRY 14.0.77")
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -211,14 +197,12 @@ else:
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     elif view == "📊 MANAGER":
-        st.header("📊 Manager - Αναφορές")
+        st.header("📊 Manager")
         t1, t2 = st.tabs(["📅 ΤΑΜΕΙΟ ΗΜΕΡΑΣ", "📆 ΠΕΡΙΟΔΟΥ"])
         
         res = supabase.table("sales").select("*").execute()
         if res.data:
             all_df = pd.DataFrame(res.data)
-            if 'action_id' not in all_df.columns: all_df['action_id'] = all_df.index
-            all_df['action_id'] = all_df['action_id'].fillna(all_df.index.to_series())
             all_df['s_date_dt'] = pd.to_datetime(all_df['s_date'])
             
             def render_manager_logic(df):
@@ -226,46 +210,36 @@ else:
                     st.info("Δεν υπάρχουν πωλήσεις.")
                     return
 
-                # --- ΛΟΓΙΚΗ ΑΡΙΘΜΗΣΗΣ ΠΡΑΞΗΣ ---
-                # Ταξινομούμε βάσει χρόνου για να βγει σωστά η σειρά
-                df = df.sort_values('s_date', ascending=True)
-                # Βρίσκουμε τα μοναδικά action_id με τη σειρά που εμφανίστηκαν
-                unique_actions = df['action_id'].unique()
-                # Φτιάχνουμε χάρτη: action_id -> αύξων αριθμός (1, 2, 3...)
-                mapping = {act_id: i+1 for i, act_id in enumerate(unique_actions)}
-                df['ΠΡΑΞΗ'] = df['action_id'].map(mapping)
+                # --- ΔΥΝΑΜΙΚΗ ΟΜΑΔΟΠΟΙΗΣΗ ΠΡΑΞΕΩΝ ---
+                # Χρησιμοποιούμε το s_date ως κλειδί ομαδοποίησης αν το action_id λείπει
+                group_col = 'action_id' if 'action_id' in df.columns and df['action_id'].notnull().any() else 's_date'
                 
-                # Μετονομασία στηλών για την αναφορά
-                df_display = df.rename(columns={
-                    's_date': 'Ημ/νία',
-                    'item_name': 'Είδος',
-                    'unit_price': 'Αρχική',
-                    'discount': 'Έκπτωση',
-                    'final_item_price': 'Τελική',
-                    'method': 'Τρόπος'
-                })
+                df = df.sort_values('s_date', ascending=True)
+                unique_groups = df[group_col].unique()
+                mapping = {val: i+1 for i, val in enumerate(unique_groups)}
+                df['ΠΡΑΞΗ'] = df[group_col].map(mapping)
                 
                 # Στατιστικά
                 m_df = df[df['method'] == 'Μετρητά']
                 k_df = df[df['method'] == 'Κάρτα']
                 m_sum, k_sum = m_df['final_item_price'].sum(), k_df['final_item_price'].sum()
-                m_count, k_count = m_df['action_id'].nunique(), k_df['action_id'].nunique()
+                m_count, k_count = m_df[group_col].nunique(), k_df[group_col].nunique()
 
                 c1, c2, c3 = st.columns(3)
                 c1.markdown(f"<div class='report-stat'><p class='stat-label'>Μετρητά ({m_count})</p><p class='stat-val'>{m_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c2.markdown(f"<div class='report-stat'><p class='stat-label'>Κάρτα ({k_count})</p><p class='stat-val'>{k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 c3.markdown(f"<div class='report-stat'><p class='stat-label'>Σύνολο ({m_count + k_count})</p><p class='stat-val'>{m_sum + k_sum:.2f}€</p></div>", unsafe_allow_html=True)
                 
-                # Εμφάνιση πίνακα (πιο πρόσφατα πάνω)
-                out_cols = ['ΠΡΑΞΗ', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Τρόπος']
-                st.dataframe(df_display.sort_values(['ΠΡΑΞΗ', 'Ημ/νία'], ascending=[False, False])[out_cols], use_container_width=True, hide_index=True)
+                # Εμφάνιση πίνακα
+                disp = df.rename(columns={'s_date':'Ημ/νία','item_name':'Είδος','unit_price':'Αρχική','discount':'Έκπτωση','final_item_price':'Τελική','method':'Τρόπος'})
+                st.dataframe(disp.sort_values(['ΠΡΑΞΗ', 'Ημ/νία'], ascending=[False, False])[['ΠΡΑΞΗ', 'Ημ/νία', 'Είδος', 'Αρχική', 'Έκπτωση', 'Τελική', 'Τρόπος']], use_container_width=True, hide_index=True)
 
             with t1:
                 render_manager_logic(all_df[all_df['s_date_dt'].dt.date == get_athens_now().date()].copy())
             with t2:
                 c1, c2 = st.columns(2)
-                d_from, d_to = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
-                render_manager_logic(all_df[(all_df['s_date_dt'].dt.date >= d_from) & (all_df['s_date_dt'].dt.date <= d_to)].copy())
+                d_f, d_t = c1.date_input("Από", get_athens_now().date()), c2.date_input("Έως", get_athens_now().date())
+                render_manager_logic(all_df[(all_df['s_date_dt'].dt.date >= d_f) & (all_df['s_date_dt'].dt.date <= d_t)].copy())
 
     elif view == "📦 ΑΠΟΘΗΚΗ":
         with st.form("inv_f", clear_on_submit=True):
