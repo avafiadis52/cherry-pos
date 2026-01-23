@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import time
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client, Client
 
 # --- 1. SUPABASE SETUP ---
@@ -15,18 +16,12 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 2. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.55", layout="wide", page_icon="🍒")
-
-st.markdown("""
-    <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
-    <link rel="icon" type="image/png" href="https://em-content.zobj.net/source/apple/354/cherries_1f352.png">
-    """, unsafe_allow_html=True)
+st.set_page_config(page_title="CHERRY v14.0.58", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
-    div[data-testid="stDialog"] label p, div[data-testid="stDialog"] h3, div[data-testid="stDialog"] .stMarkdown p, div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p { color: #111111 !important; }
     input { color: #000000 !important; font-weight: bold !important; font-size: 1.2rem !important; }
     .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
@@ -48,8 +43,45 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
+if 'voice_cmd' not in st.session_state: st.session_state.voice_cmd = ""
 
-# --- 3. FUNCTIONS ---
+# --- 3. EXPERIMENTAL: VOICE ROUTINE ---
+def voice_logic():
+    cmd = st.session_state.voice_cmd.lower()
+    if "διαγραφή" in cmd or "άδειασμα" in cmd:
+        st.session_state.cart = []
+        st.toast("Το καλάθι άδειασε φωνητικά!")
+        st.session_state.voice_cmd = ""
+    elif "ταμείο" in cmd or "πληρωμή" in cmd:
+        st.toast("Άνοιγμα πληρωμής...")
+        # Εδώ μπορούμε να προσθέσουμε αυτόματο άνοιγμα του διαλόγου πληρωμής
+
+def st_voice_commander():
+    # JavaScript component for Browser Speech Recognition
+    v_code = """
+    <script>
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'el-GR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    document.addEventListener('voice_start', () => {
+        recognition.start();
+    });
+
+    recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        window.parent.postMessage({type: 'voice_result', text: text}, '*');
+    };
+    </script>
+    <button onclick="document.dispatchEvent(new CustomEvent('voice_start'))" 
+            style="width: 100%; height: 50px; background-color: #e74c3c; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+        🎤 ΦΩΝΗΤΙΚΗ ΕΝΤΟΛΗ (Πειραματικό)
+    </button>
+    """
+    components.html(v_code, height=60)
+
+# --- 4. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
@@ -62,10 +94,7 @@ def reset_app():
     st.rerun()
 
 def play_sound(url):
-    st.components.v1.html(
-        f"""<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>""",
-        height=0,
-    )
+    st.components.v1.html(f"""<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>""", height=0)
 
 @st.dialog("➕ Χειροκίνητο Είδος (999)")
 def manual_item_popup():
@@ -122,10 +151,7 @@ def finalize(disc_val, method):
                 res = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res.data:
                     supabase.table("inventory").update({"stock": res.data[0]['stock'] - 1}).eq("barcode", i['bc']).execute()
-        st.balloons()
-        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
-        time.sleep(2.0)
-        reset_app()
+        st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(2.0); reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def display_report(sales_df):
@@ -145,32 +171,27 @@ def display_report(sales_df):
     cols = st.columns(5)
     cols[0].markdown(f"<div class='report-stat'><p class='stat-label'>ΜΕΤΡΗΤΑ ({len(m_df)})</p><p class='stat-val'>{m_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     cols[1].markdown(f"<div class='report-stat'><p class='stat-label'>ΚΑΡΤΑ ({len(k_df)})</p><p class='stat-val'>{k_df['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[2].markdown(f"<div class='report-stat'><p class='stat-label'>ΕΚΠΤΩΣΕΙΣ</p><p class='stat-val'>{df['discount'].sum():.2f}€</p></div>", unsafe_allow_html=True)
-    cols[3].markdown(f"<div class='report-stat'><p class='stat-label'>ΕΙΔΗ</p><p class='stat-val'>{len(df)}</p></div>", unsafe_allow_html=True)
     cols[4].markdown(f"<div class='report-stat'><p class='stat-label'>ΣΥΝΟΛΟ ({len(unique_trans)})</p><p class='stat-val'>{unique_trans['final_item_price'].sum():.2f}€</p></div>", unsafe_allow_html=True)
     for day, day_data in df.groupby('day_str', sort=True):
         st.subheader(f"📅 {datetime.strptime(day, '%Y-%m-%d').strftime('%d/%m/%Y')}")
-        st.dataframe(day_data[['#', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'Πελάτης']].sort_values('#', ascending=True), use_container_width=True, hide_index=True)
+        st.dataframe(day_data[['#', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'Πελάτης']], use_container_width=True, hide_index=True)
 
-# --- 4. MAIN UI ---
+# --- 5. MAIN UI ---
 if st.session_state.is_logged_out:
     st.markdown("<h1 style='text-align: center; color: #e74c3c; margin-top: 100px;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
-    if st.button("Επανασύνδεση"):
-        st.session_state.is_logged_out = False
-        st.rerun()
+    if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
 else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y')}<br>{now.strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.55")
+        st.title("CHERRY 14.0.58")
         view = st.radio("ΜΕΝΟΥ", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
+        st_voice_commander() # Experimental Voice Button in Sidebar
         if st.button("❌ ΕΞΟΔΟΣ", key="logout_btn", use_container_width=True): 
-            st.session_state.cart = []
-            st.session_state.selected_cust_id = None
-            st.session_state.is_logged_out = True
-            st.rerun()
+            st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
     if view == "🛒 ΤΑΜΕΙΟ":
+        voice_logic() # Run voice command check
         st.markdown(f"<div class='status-header'>ΠΕΛΑΤΗΣ: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
         cl, cr = st.columns([1, 1.5])
         with cl:
@@ -180,13 +201,9 @@ else:
                     clean_ph = "".join(filter(str.isdigit, ph))
                     if len(clean_ph) == 10:
                         res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
-                        if res.data: 
-                            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
-                            st.rerun()
+                        if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
                         else: new_customer_popup(clean_ph)
-                    elif len(clean_ph) > 0:
-                        play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                        st.error("Απαιτούνται 10 ψηφία!")
+                    elif len(clean_ph) > 0: play_sound("https://www.soundjay.com/buttons/beep-10.mp3"); st.error("Απαιτούνται 10 ψηφία!")
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
                 st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
@@ -199,14 +216,10 @@ else:
                             item = res.data[0]
                             st.session_state.cart.append({'bc': item['barcode'], 'name': item['name'], 'price': round(float(item['price']), 2)})
                             st.session_state.bc_key += 1; st.rerun()
-                        else: 
-                            play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
-                            st.error("Barcode δεν βρέθηκε!")
-                
+                        else: play_sound("https://www.soundjay.com/buttons/beep-10.mp3"); st.error("Barcode δεν βρέθηκε!")
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} ({item['price']}€)", key=f"del_{idx}", use_container_width=True):
                         st.session_state.cart.pop(idx); st.rerun()
-                
                 if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
             if st.button("❌ ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
@@ -220,7 +233,7 @@ else:
         if res_all.data:
             full_df = pd.DataFrame(res_all.data)
             full_df['s_date_dt'] = pd.to_datetime(full_df['s_date'])
-            t1, t2 = st.tabs(["ΣΗΜΕΡΑ", "ΙΣΤΟΡΙΚΟ"])
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📜 ΙΣΤΟΡΙΚΟ"])
             with t1: display_report(full_df[full_df['s_date_dt'].dt.date == get_athens_now().date()])
             with t2:
                 c1, c2 = st.columns(2)
