@@ -23,7 +23,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.60", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.61", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -138,7 +138,7 @@ else:
     with st.sidebar:
         now = get_athens_now()
         st.markdown(f"<div class='sidebar-date'>{now.strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.title("CHERRY 14.0.60")
+        st.title("CHERRY 14.0.61")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="Πείτε Είδος και Τιμή", key=f"mic_{st.session_state.mic_key}")
             if text and text != st.session_state.last_speech:
@@ -164,7 +164,6 @@ else:
         cl, cr = st.columns([1, 1.5])
         with cl:
             if st.session_state.selected_cust_id is None:
-                # 1) Placeholder με 10 παύλες
                 ph = st.text_input("Τηλέφωνο Πελάτη", placeholder="----------", key=f"ph_{st.session_state.ph_key}")
                 if ph and len(ph) == 10:
                     res = supabase.table("customers").select("*").eq("phone", ph).execute()
@@ -184,7 +183,7 @@ else:
                             st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
                             st.session_state.bc_key += 1; st.rerun()
                         else: 
-                            # 2) Beep αν δεν βρεθεί barcode
+                            # Άμεση πυροδότηση ήχου πριν το μήνυμα σφάλματος
                             play_sound("https://www.soundjay.com/buttons/beep-10.mp3")
                             st.error("Barcode δεν υπάρχει!")
                 for idx, item in enumerate(st.session_state.cart):
