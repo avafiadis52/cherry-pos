@@ -4,7 +4,7 @@ import time
 import streamlit as st
 from supabase import create_client, Client
 
-# --- 1. VOICE COMPONENT SETUP (Version v14.0.70) ---
+# --- 1. VOICE COMPONENT SETUP ---
 HAS_MIC = False
 try:
     from streamlit_mic_recorder import speech_to_text
@@ -20,14 +20,13 @@ SUPABASE_KEY = "sb_publishable_ualF72lJKgUQA4TzjPQ-OA_zih7zJ-s"
 def init_supabase():
     try:
         return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        st.error(f"Supabase Connection Error: {e}")
+    except Exception:
         return None
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.70", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.71) ---
+st.set_page_config(page_title="CHERRY v14.0.71", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +55,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 7000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 8000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -67,6 +66,17 @@ def reset_app():
     st.session_state.cust_name = "Λιανική Πώληση"
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
+
+def speak_error():
+    """Εκτελεί φωνητικό μήνυμα 'Δεν κατάλαβα' μέσω JavaScript"""
+    js = """
+    <script>
+    var msg = new SpeechSynthesisUtterance('Δεν κατάλαβα');
+    msg.lang = 'el-GR';
+    window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.components.v1.html(js, height=0)
 
 def play_sound(url):
     st.components.v1.html(f'<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>', height=0)
@@ -114,7 +124,7 @@ else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         
-        # --- VOICE COMMAND SECTION ---
+        # --- VOICE COMMAND SECTION (DIRECT ENTRY) ---
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
             text = speech_to_text(
@@ -125,20 +135,30 @@ else:
                 key=f"voice_{st.session_state.mic_key}"
             )
             
-            if text and supabase:
+            if text:
                 query = text.lower().strip()
-                st.info(f"Αναζήτηση για: {query}")
-                # Χρήση ilike για μεγαλύτερη ευελιξία στην αναζήτηση
-                res = supabase.table("inventory").select("*").ilike("name", f"%{query}%").execute()
-                if res.data:
-                    it = res.data[0]
-                    st.session_state.cart.append({'bc': it['barcode'], 'name': it['name'], 'price': round(float(it['price']), 2)})
-                    st.success(f"Προστέθηκε: {it['name']}")
+                words = query.split()
+                found_price = None
+                
+                # Μετατροπή λέξεων σε αριθμούς (βασική υλοποίηση)
+                num_map = {"ένα":1, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50}
+                
+                for w in words:
+                    if w.isdigit(): found_price = float(w)
+                    elif w in num_map: found_price = float(num_map[w])
+                
+                if found_price:
+                    item_name = query.replace(str(int(found_price)) if found_price.is_integer() else str(found_price), "").replace("ευρώ", "").strip()
+                    if not item_name: item_name = "Φωνητική Πώληση"
+                    
+                    st.session_state.cart.append({'bc': 'VOICE', 'name': item_name.upper(), 'price': found_price})
+                    st.success(f"Προστέθηκε: {item_name.upper()} - {found_price}€")
                     st.session_state.mic_key += 1
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.warning(f"Δεν βρέθηκε προϊόν για: '{query}'")
+                    speak_error()
+                    st.warning("Δεν βρέθηκε τιμή στην εντολή.")
         else:
             st.info("Φωνητικές εντολές: Μη διαθέσιμες")
 
