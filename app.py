@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.73) ---
-st.set_page_config(page_title="CHERRY v14.0.73", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.74) ---
+st.set_page_config(page_title="CHERRY v14.0.74", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 11000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 12000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -69,8 +69,19 @@ def reset_app():
     st.rerun()
 
 def speak_text(text_to_say):
+    # JS που παίζει ήχο Beep και μετά μιλάει
     js = f"""
     <script>
+    // Beep sound
+    var context = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = context.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, context.currentTime);
+    osc.connect(context.destination);
+    osc.start();
+    osc.stop(context.currentTime + 0.2);
+
+    // Speech
     var msg = new SpeechSynthesisUtterance('{text_to_say}');
     msg.lang = 'el-GR';
     window.speechSynthesis.speak(msg);
@@ -124,7 +135,7 @@ else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         
-        # --- VOICE COMMAND SECTION (DIRECT ENTRY ONLY) ---
+        # --- VOICE COMMAND SECTION (DIRECT ENTRY) ---
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
             text = speech_to_text(
@@ -139,9 +150,8 @@ else:
                 raw_query = text.lower().strip()
                 st.write(f"Είπες: **{raw_query}**")
                 
-                # 1. Εύρεση αριθμών (π.χ. "20")
+                # 1. Εύρεση αριθμών
                 numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
-                # 2. Χάρτης ελληνικών λέξεων για αριθμούς
                 num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
                 
                 found_price = None
@@ -153,9 +163,7 @@ else:
                             found_price = float(val)
                             break
                 
-                # ΚΑΤΑΧΩΡΗΣΗ
                 if found_price:
-                    # Καθαρισμός ονόματος
                     clean_name = raw_query
                     if numbers: clean_name = clean_name.replace(numbers[0], "")
                     for w in ["ευρώ", "ευρω", "τιμή", "τιμη"]: clean_name = clean_name.replace(w, "")
@@ -163,16 +171,15 @@ else:
                     
                     final_name = clean_name.strip().upper() if clean_name.strip() else "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ"
                     
-                    # Άμεση προσθήκη στο καλάθι
                     st.session_state.cart.append({'bc': 'VOICE', 'name': final_name, 'price': found_price})
                     st.success(f"Καταχωρήθηκε: {final_name} - {found_price}€")
                     st.session_state.mic_key += 1
                     time.sleep(0.4)
                     st.rerun()
                 else:
-                    # Αν δεν υπάρχει τιμή, δεν ψάχνουμε αποθήκη, απλά βγάζουμε σφάλμα
+                    # ΕΠΑΝΑΦΟΡΑ BEEP ΚΑΙ ΦΩΝΗΣ ΣΦΑΛΜΑΤΟΣ
                     speak_text("Δεν κατάλαβα")
-                    st.warning("Παρακαλώ πείτε το είδος και την τιμή (π.χ. Παντελόνι 30)")
+                    st.warning("Σφάλμα: Δεν βρέθηκε τιμή.")
         else:
             st.info("Φωνητικές εντολές: Μη διαθέσιμες")
 
