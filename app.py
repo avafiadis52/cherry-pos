@@ -4,14 +4,14 @@ import time
 import streamlit as st
 from supabase import create_client, Client
 
-# --- 1. VOICE COMPONENT SETUP ---
+# --- 1. VOICE COMPONENT SETUP (SAFE LOAD) ---
+# Χρησιμοποιούμε try-except για να μην κολλάει η εφαρμογή αν η βιβλιοθήκη λείπει
 HAS_MIC = False
 try:
     from streamlit_mic_recorder import speech_to_text
     HAS_MIC = True
-except Exception as e:
+except Exception:
     HAS_MIC = False
-    MIC_ERROR = str(e)
 
 # --- 2. SUPABASE SETUP ---
 SUPABASE_URL = "https://hnwynihjkdkryrfepenh.supabase.co"
@@ -19,12 +19,16 @@ SUPABASE_KEY = "sb_publishable_ualF72lJKgUQA4TzjPQ-OA_zih7zJ-s"
 
 @st.cache_resource
 def init_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        st.error(f"Supabase Connection Error: {e}")
+        return None
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.67) ---
-st.set_page_config(page_title="CHERRY v14.0.67", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.69) ---
+st.set_page_config(page_title="CHERRY v14.0.69", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -46,14 +50,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Session States
+# Session States initialization
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
 if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανική Πώληση"
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 4000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 6000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -69,6 +73,7 @@ def play_sound(url):
     st.components.v1.html(f'<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>', height=0)
 
 def finalize(disc_val, method):
+    if not supabase: return
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
@@ -110,7 +115,7 @@ else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         
-        # --- VOICE COMMAND RE-ENGINEERED ---
+        # --- VOICE COMMAND SECTION ---
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
             text = speech_to_text(
@@ -121,7 +126,7 @@ else:
                 key=f"voice_{st.session_state.mic_key}"
             )
             
-            if text:
+            if text and supabase:
                 query = text.lower().strip()
                 st.write(f"Είπες: **{query}**")
                 res = supabase.table("inventory").select("*").ilike("name", f"%{query}%").execute()
@@ -135,7 +140,7 @@ else:
                 else:
                     st.warning("Δεν βρέθηκε προϊόν.")
         else:
-            st.error("Το μικρόφωνο δεν είναι διαθέσιμο.")
+            st.info("Φωνητικές εντολές: Μη διαθέσιμες")
 
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
@@ -148,7 +153,7 @@ else:
         with cl:
             if st.session_state.selected_cust_id is None:
                 ph = st.text_input("Τηλέφωνο", key=f"ph_{st.session_state.ph_key}")
-                if ph and len(ph) == 10:
+                if ph and len(ph) == 10 and supabase:
                     res = supabase.table("customers").select("*").eq("phone", ph).execute()
                     if res.data: 
                         st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
@@ -157,7 +162,7 @@ else:
             else:
                 st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
                 bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
-                if bc:
+                if bc and supabase:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
                     if res.data:
                         st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
@@ -173,7 +178,7 @@ else:
             st.markdown(f"<div class='cart-area'>{'Είδος':<20} | {'Τιμή':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
-    elif view == "📊 MANAGER":
+    elif view == "📊 MANAGER" and supabase:
         st.title("📊 Αναφορές")
         res = supabase.table("sales").select("*").execute()
         if res.data:
@@ -203,18 +208,11 @@ else:
                     pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
                     st.subheader("🗓️ Σύνολα ανά Ημέρα")
                     daily_sum = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(Τζίρος=('final_item_price','sum'), Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()), Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()), Πράξεις=('s_date', 'nunique')).sort_index(ascending=False).reset_index()
-                    
-                    def style_daily(styler):
-                        styler.format("{:.2f}€", subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
-                        styler.set_properties(**{'color': 'white', 'font-weight': 'bold'}, subset=['ΗΜΕΡΟΜΗΝΙΑ', 'Πράξεις'])
-                        styler.set_properties(**{'color': '#2ecc71', 'font-weight': 'bold'}, subset=['Τζίρος', 'Μετρητά', 'Κάρτα'])
-                        return styler
-                    
-                    st.table(style_daily(daily_sum.style.hide(axis='index')))
+                    st.table(daily_sum)
                     st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
-    elif view == "📦 ΑΠΟΘΗΚΗ":
+    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         with st.form("inv_f", clear_on_submit=True):
             c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή"), c4.number_input("Stock")
             if st.form_submit_button("Προσθήκη") and b and n: supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
@@ -222,7 +220,7 @@ else:
             st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
             if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
 
-    elif view == "👥 ΠΕΛΑΤΕΣ":
+    elif view == "👥 ΠΕΛΑΤΕΣ" and supabase:
         for r in supabase.table("customers").select("*").execute().data:
             st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
             if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
