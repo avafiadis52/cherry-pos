@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.75) ---
-st.set_page_config(page_title="CHERRY v14.0.75", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.76) ---
+st.set_page_config(page_title="CHERRY v14.0.76", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 13000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 14000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -69,7 +69,6 @@ def reset_app():
     st.rerun()
 
 def speak_text(text_to_say, play_beep=True):
-    # JS που παίζει ήχο Beep και προαιρετικά μιλάει
     beep_js = """
     var context = new (window.AudioContext || window.webkitAudioContext)();
     var osc = context.createOscillator();
@@ -110,22 +109,32 @@ def finalize(disc_val, method):
 @st.dialog("💰 Πληρωμή")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f"<h3 style='text-align:center;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
-    opt = st.radio("Έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
+    st.write(f"💵 **Σύνολο Καλαθιού:** {total:.2f}€")
+    
+    opt = st.radio("Θέλετε να εφαρμόσετε έκπτωση;", ["ΟΧΙ", "ΝΑΙ"], horizontal=True)
     disc = 0.0
     if opt == "ΝΑΙ":
-        inp = st.text_input("Ποσό ή %")
+        inp = st.text_input("Ποσό έκπτωσης (π.χ. 5) ή Ποσοστό (π.χ. 10%)")
         if inp:
             try:
-                if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
-                else: disc = round(float(inp), 2)
-            except: st.error("Λάθος μορφή")
+                if "%" in inp: 
+                    p_val = float(inp.replace("%",""))
+                    disc = round((p_val/100 * total), 2)
+                    st.info(f"Έκπτωση {p_val}%: -{disc:.2f}€")
+                else: 
+                    disc = round(float(inp), 2)
+                    st.info(f"Έκπτωση ποσού: -{disc:.2f}€")
+            except: st.error("Παρακαλώ εισάγετε σωστή μορφή (π.χ. 5 ή 10%)")
+    
     final_p = round(total - disc, 2)
-    st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
+    st.markdown(f"<div style='text-align:center; font-weight:bold;'>ΤΕΛΙΚΟ ΠΟΣΟ ΠΛΗΡΩΜΗΣ</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='final-amount-popup'>{final_p:.2f}€</div>", unsafe_allow_html=True)
+    st.divider()
+    
     c1, c2 = st.columns(2)
-    if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
-    if c2.button("💳 Κάρτα", use_container_width=True): finalize(disc, "Κάρτα")
+    if c1.button("💵 ΜΕΤΡΗΤΑ", use_container_width=True): finalize(disc, "Μετρητά")
+    if c2.button("💳 ΚΑΡΤΑ", use_container_width=True): finalize(disc, "Κάρτα")
 
 # --- 5. MAIN UI ---
 if st.session_state.is_logged_out:
@@ -135,7 +144,6 @@ else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         
-        # --- VOICE COMMAND SECTION ---
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
             text = speech_to_text(
@@ -202,7 +210,6 @@ else:
                         st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': float(res.data[0]['price'])})
                         st.session_state.bc_key += 1; st.rerun()
                     else:
-                        # --- BEEP ΣΤΟ ΛΑΘΟΣ BARCODE ---
                         speak_text("", play_beep=True)
                         st.error(f"Το Barcode {bc} δεν βρέθηκε!")
                         
