@@ -3,6 +3,7 @@ from datetime import datetime, date, timedelta
 import time
 import streamlit as st
 from supabase import create_client, Client
+import re
 
 # --- 1. VOICE COMPONENT SETUP ---
 HAS_MIC = False
@@ -25,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.71) ---
-st.set_page_config(page_title="CHERRY v14.0.71", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.73) ---
+st.set_page_config(page_title="CHERRY v14.0.73", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -55,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 8000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 11000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -67,11 +68,10 @@ def reset_app():
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
 
-def speak_error():
-    """Εκτελεί φωνητικό μήνυμα 'Δεν κατάλαβα' μέσω JavaScript"""
-    js = """
+def speak_text(text_to_say):
+    js = f"""
     <script>
-    var msg = new SpeechSynthesisUtterance('Δεν κατάλαβα');
+    var msg = new SpeechSynthesisUtterance('{text_to_say}');
     msg.lang = 'el-GR';
     window.speechSynthesis.speak(msg);
     </script>
@@ -124,7 +124,7 @@ else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         
-        # --- VOICE COMMAND SECTION (DIRECT ENTRY) ---
+        # --- VOICE COMMAND SECTION (DIRECT ENTRY ONLY) ---
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
             text = speech_to_text(
@@ -136,29 +136,43 @@ else:
             )
             
             if text:
-                query = text.lower().strip()
-                words = query.split()
+                raw_query = text.lower().strip()
+                st.write(f"Είπες: **{raw_query}**")
+                
+                # 1. Εύρεση αριθμών (π.χ. "20")
+                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
+                # 2. Χάρτης ελληνικών λέξεων για αριθμούς
+                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
+                
                 found_price = None
+                if numbers:
+                    found_price = float(numbers[0])
+                else:
+                    for word, val in num_map.items():
+                        if word in raw_query:
+                            found_price = float(val)
+                            break
                 
-                # Μετατροπή λέξεων σε αριθμούς (βασική υλοποίηση)
-                num_map = {"ένα":1, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50}
-                
-                for w in words:
-                    if w.isdigit(): found_price = float(w)
-                    elif w in num_map: found_price = float(num_map[w])
-                
+                # ΚΑΤΑΧΩΡΗΣΗ
                 if found_price:
-                    item_name = query.replace(str(int(found_price)) if found_price.is_integer() else str(found_price), "").replace("ευρώ", "").strip()
-                    if not item_name: item_name = "Φωνητική Πώληση"
+                    # Καθαρισμός ονόματος
+                    clean_name = raw_query
+                    if numbers: clean_name = clean_name.replace(numbers[0], "")
+                    for w in ["ευρώ", "ευρω", "τιμή", "τιμη"]: clean_name = clean_name.replace(w, "")
+                    for word in num_map.keys(): clean_name = clean_name.replace(word, "")
                     
-                    st.session_state.cart.append({'bc': 'VOICE', 'name': item_name.upper(), 'price': found_price})
-                    st.success(f"Προστέθηκε: {item_name.upper()} - {found_price}€")
+                    final_name = clean_name.strip().upper() if clean_name.strip() else "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ"
+                    
+                    # Άμεση προσθήκη στο καλάθι
+                    st.session_state.cart.append({'bc': 'VOICE', 'name': final_name, 'price': found_price})
+                    st.success(f"Καταχωρήθηκε: {final_name} - {found_price}€")
                     st.session_state.mic_key += 1
-                    time.sleep(0.5)
+                    time.sleep(0.4)
                     st.rerun()
                 else:
-                    speak_error()
-                    st.warning("Δεν βρέθηκε τιμή στην εντολή.")
+                    # Αν δεν υπάρχει τιμή, δεν ψάχνουμε αποθήκη, απλά βγάζουμε σφάλμα
+                    speak_text("Δεν κατάλαβα")
+                    st.warning("Παρακαλώ πείτε το είδος και την τιμή (π.χ. Παντελόνι 30)")
         else:
             st.info("Φωνητικές εντολές: Μη διαθέσιμες")
 
@@ -185,7 +199,7 @@ else:
                 if bc and supabase:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
                     if res.data:
-                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'], 'price': float(res.data[0]['price'])})
+                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': float(res.data[0]['price'])})
                         st.session_state.bc_key += 1; st.rerun()
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True):
