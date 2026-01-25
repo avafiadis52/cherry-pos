@@ -2,15 +2,16 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import time
 import streamlit as st
-import re
 from supabase import create_client, Client
 
-# --- 1. VOICE COMPONENT ---
+# --- 1. VOICE COMPONENT SETUP ---
+HAS_MIC = False
 try:
     from streamlit_mic_recorder import speech_to_text
     HAS_MIC = True
-except ImportError:
+except Exception as e:
     HAS_MIC = False
+    MIC_ERROR = str(e)
 
 # --- 2. SUPABASE SETUP ---
 SUPABASE_URL = "https://hnwynihjkdkryrfepenh.supabase.co"
@@ -23,7 +24,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.65", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.0.66", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -52,15 +53,14 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'last_speech' not in st.session_state: st.session_state.last_speech = ""
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 2000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 3000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def reset_app():
-    st.session_state.cart, st.session_state.selected_cust_id, st.session_state.last_speech = [], None, ""
+    st.session_state.cart, st.session_state.selected_cust_id = [], None
     st.session_state.cust_name = "Λιανική Πώληση"
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
@@ -110,34 +110,33 @@ else:
     with st.sidebar:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         
-        # --- ENHANCED VOICE COMMAND LOGIC ---
+        # --- VOICE COMMAND RE-ENGINEERED ---
+        st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
-            st.write("🎙️ Φωνητική Εντολή:")
-            # Το speech_to_text επιστρέφει το κείμενο όταν σταματήσει η ομιλία
-            spoken_text = speech_to_text(
+            # Χρήση του speech_to_text απευθείας με αυτόματο callback
+            text = speech_to_text(
                 language='el', 
-                start_prompt="🔊 ΠΕΣ ΠΡΟΪΟΝ", 
-                stop_prompt="🛑 ΤΕΛΟΣ", 
-                key=f"mic_{st.session_state.mic_key}"
+                start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", 
+                stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", 
+                just_once=True,
+                key=f"voice_{st.session_state.mic_key}"
             )
             
-            if spoken_text:
-                cmd = spoken_text.lower().strip()
-                st.info(f"Αναζήτηση για: {cmd}")
-                # Αναζήτηση στην αποθήκη
-                res = supabase.table("inventory").select("*").ilike("name", f"%{cmd}%").execute()
+            if text:
+                query = text.lower().strip()
+                st.write(f"Είπες: **{query}**")
+                res = supabase.table("inventory").select("*").ilike("name", f"%{query}%").execute()
                 if res.data:
                     it = res.data[0]
                     st.session_state.cart.append({'bc': it['barcode'], 'name': it['name'], 'price': round(float(it['price']), 2)})
-                    st.toast(f"✅ {it['name']} προστέθηκε!")
-                    # Αλλάζουμε το κλειδί για να επαναφέρουμε το μικρόφωνο σε καθαρή κατάσταση
+                    st.success(f"Προστέθηκε: {it['name']}")
                     st.session_state.mic_key += 1
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.warning(f"❌ Δεν βρέθηκε το '{cmd}'")
+                    st.warning("Δεν βρέθηκε προϊόν.")
         else:
-            st.error("Το Mic Recorder δεν αναγνωρίζεται.")
+            st.error(f"Το μικρόφωνο δεν είναι διαθέσιμο. (Error: {MIC_ERROR if 'MIC_ERROR' in locals() else 'Library missing'})")
 
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
