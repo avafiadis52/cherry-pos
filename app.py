@@ -23,8 +23,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.0.66", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.67) ---
+st.set_page_config(page_title="CHERRY v14.0.67", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -53,7 +53,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 3000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 4000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -113,7 +113,6 @@ else:
         # --- VOICE COMMAND RE-ENGINEERED ---
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
-            # Χρήση του speech_to_text απευθείας με αυτόματο callback
             text = speech_to_text(
                 language='el', 
                 start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", 
@@ -136,7 +135,7 @@ else:
                 else:
                     st.warning("Δεν βρέθηκε προϊόν.")
         else:
-            st.error(f"Το μικρόφωνο δεν είναι διαθέσιμο. (Error: {MIC_ERROR if 'MIC_ERROR' in locals() else 'Library missing'})")
+            st.error("Το μικρόφωνο δεν είναι διαθέσιμο.")
 
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
