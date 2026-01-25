@@ -4,8 +4,7 @@ import time
 import streamlit as st
 from supabase import create_client, Client
 
-# --- 1. VOICE COMPONENT SETUP (SAFE LOAD) ---
-# Χρησιμοποιούμε try-except για να μην κολλάει η εφαρμογή αν η βιβλιοθήκη λείπει
+# --- 1. VOICE COMPONENT SETUP (Version v14.0.70) ---
 HAS_MIC = False
 try:
     from streamlit_mic_recorder import speech_to_text
@@ -27,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.69) ---
-st.set_page_config(page_title="CHERRY v14.0.69", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE ---
+st.set_page_config(page_title="CHERRY v14.0.70", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -50,14 +49,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Session States initialization
+# Session States
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
 if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανική Πώληση"
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 6000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 7000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -128,7 +127,8 @@ else:
             
             if text and supabase:
                 query = text.lower().strip()
-                st.write(f"Είπες: **{query}**")
+                st.info(f"Αναζήτηση για: {query}")
+                # Χρήση ilike για μεγαλύτερη ευελιξία στην αναζήτηση
                 res = supabase.table("inventory").select("*").ilike("name", f"%{query}%").execute()
                 if res.data:
                     it = res.data[0]
@@ -138,7 +138,7 @@ else:
                     time.sleep(0.5)
                     st.rerun()
                 else:
-                    st.warning("Δεν βρέθηκε προϊόν.")
+                    st.warning(f"Δεν βρέθηκε προϊόν για: '{query}'")
         else:
             st.info("Φωνητικές εντολές: Μη διαθέσιμες")
 
