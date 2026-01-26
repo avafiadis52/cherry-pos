@@ -233,4 +233,27 @@ else:
                 if not pdf.empty:
                     m_p, c_p = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
-                    c1, c
+                    c1, c2, c3 = st.columns(3)
+                    c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
+                    c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
+                    c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
+                    
+                    all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
+                    for day in all_days:
+                        day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
+                        st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
+                        day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
+                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        with st.form("inv_f", clear_on_submit=True):
+            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή"), c4.number_input("Stock")
+            if st.form_submit_button("Προσθήκη") and b and n: supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
+        for r in supabase.table("inventory").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        for r in supabase.table("customers").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
