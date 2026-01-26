@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.03) ---
-st.set_page_config(page_title="CHERRY v14.2.03", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.04) ---
+st.set_page_config(page_title="CHERRY v14.2.04", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -44,7 +44,8 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
-    .day-header { background-color: #34495e; color: #f1c40f; padding: 8px; border-radius: 5px; margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-left: 10px solid #f1c40f; }
+    .day-header { background-color: #34495e; color: #ffffff; padding: 10px; border-radius: 5px; margin-top: 25px; margin-bottom: 10px; font-weight: bold; border-left: 10px solid #f1c40f; font-size: 14px; line-height: 1.6; }
+    .day-header-main { color: #f1c40f; font-size: 18px; margin-right: 15px; }
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
     </style>
@@ -230,14 +231,12 @@ else:
 
     elif view == "📊 MANAGER" and supabase:
         st.title("📊 Αναφορές")
-        # Fetch sales and customers to join names
         res_s = supabase.table("sales").select("*").execute()
         res_c = supabase.table("customers").select("id, name").execute()
         if res_s.data:
             df = pd.DataFrame(res_s.data)
             cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
             df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
-            
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             today_date = get_athens_now().date()
@@ -259,17 +258,27 @@ else:
                 cs, ce = st.columns(2); sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
                 if not pdf.empty:
-                    m_p, c_p = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
                     
                     all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
                     for day in all_days:
                         day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
-                        st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
+                        # Calculate daily stats
+                        d_total = day_df['final_item_price'].sum()
+                        d_cash = day_df[day_df['method'] == 'Μετρητά']
+                        d_card = day_df[day_df['method'] == 'Κάρτα']
+                        d_disc = day_df['discount'].sum()
+                        
+                        header_html = f"""
+                        <div class='day-header'>
+                            <span class='day-header-main'>📅 {day.strftime('%d/%m/%Y')}</span>
+                            <span style='color:#2ecc71;'>● ΤΖΙΡΟΣ: {d_total:.2f}€</span> | 
+                            <span>💵 ΜΕΤΡΗΤΑ: {d_cash['final_item_price'].sum():.2f}€ ({d_cash['s_date'].nunique()})</span> | 
+                            <span>💳 ΚΑΡΤΕΣ: {d_card['final_item_price'].sum():.2f}€ ({d_card['s_date'].nunique()})</span> | 
+                            <span style='color:#e74c3c;'>📉 ΕΚΠΤΩΣΕΙΣ: {d_disc:.2f}€</span>
+                        </div>
+                        """
+                        st.markdown(header_html, unsafe_allow_html=True)
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
                         st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
@@ -318,13 +327,4 @@ else:
             if s_p: f_df = f_df[f_df['phone'].str.contains(s_p, na=False)]
             f_df = f_df.sort_values(by='name', ascending=True)
             csv = f_df[['name', 'phone']].to_csv(index=False).encode('utf-8-sig')
-            c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"customers_{date.today()}.csv", mime='text/csv', use_container_width=True)
-            st.divider()
-            for _, r in f_df.iterrows():
-                col1, col2, col3 = st.columns([4, 1, 1])
-                with col1: st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-                with col2:
-                    if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
-                with col3:
-                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-        else: st.info("Δεν υπάρχουν πελάτες.")
+            c3.download_button(label="📥 ΕΚ
