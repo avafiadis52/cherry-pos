@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.22) ---
-st.set_page_config(page_title="CHERRY v14.2.22", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.23) ---
+st.set_page_config(page_title="CHERRY v14.2.23", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -129,6 +129,27 @@ def edit_customer_popup(customer):
             st.success("Οι αλλαγές αποθηκεύτηκαν!")
             time.sleep(1); st.rerun()
         except Exception as e: st.error(f"Σφάλμα: {e}")
+
+@st.dialog("📜 Ιστορικό Αγορών")
+def customer_history_popup(customer):
+    st.subheader(f"Αγορές: {customer['name']}")
+    try:
+        res = supabase.table("sales").select("*").eq("cust_id", customer['id']).order("s_date", desc=True).execute()
+        if res.data:
+            h_df = pd.DataFrame(res.data)
+            h_df['ΗΜΕΡΟΜΗΝΙΑ'] = pd.to_datetime(h_df['s_date']).dt.strftime('%d/%m/%y %H:%M')
+            st.dataframe(h_df[['ΗΜΕΡΟΜΗΝΙΑ', 'item_name', 'final_item_price', 'method']], 
+                         column_config={
+                             "item_name": "Είδος",
+                             "final_item_price": st.column_config.NumberColumn("Τιμή €", format="%.2f"),
+                             "method": "Πληρωμή"
+                         }, 
+                         use_container_width=True, hide_index=True)
+            st.markdown(f"**Συνολικές Αγορές: {h_df['final_item_price'].sum():.2f}€**")
+        else:
+            st.info("Δεν βρέθηκαν αγορές για αυτόν τον πελάτη.")
+    except Exception as e:
+        st.error(f"Σφάλμα ανάκτησης: {e}")
 
 def finalize(disc_val, method):
     if not supabase: return
@@ -351,14 +372,13 @@ else:
             csv = f_df[['name', 'phone']].to_csv(index=False).encode('utf-8-sig')
             c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"customers_{date.today()}.csv", mime='text/csv', use_container_width=True)
             st.divider()
-            
-            # --- ΣΤΟΙΧΙΣΜΕΝΗ ΛΙΣΤΑ ΠΕΛΑΤΩΝ ---
             for _, r in f_df.iterrows():
-                col1, col2, col3 = st.columns([4, 1, 1])
-                # Σταθερή στοίχιση για το Όνομα (30 χαρακτήρες) και το Τηλέφωνο
+                col1, col2, col3, col4 = st.columns([4, 0.5, 0.5, 0.5])
                 cust_text = f"👤 {r['name'][:30]:<30} | 📞 {r['phone']}"
                 with col1: st.markdown(f"<div class='data-row'>{cust_text}</div>", unsafe_allow_html=True)
                 with col2:
-                    if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
+                    if st.button("📜", key=f"hist_{r['id']}", help="Ιστορικό Αγορών", use_container_width=True): customer_history_popup(r)
                 with col3:
-                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+                    if st.button("📝", key=f"edit_{r['id']}", help="Επεξεργασία", use_container_width=True): edit_customer_popup(r)
+                with col4:
+                    if st.button("❌", key=f"c_{r['id']}", help="Διαγραφή", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
