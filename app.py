@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.20) ---
-st.set_page_config(page_title="CHERRY v14.2.20", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.21) ---
+st.set_page_config(page_title="CHERRY v14.2.21", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -47,7 +47,16 @@ st.markdown("""
         border: 1px solid #808080 !important;
     }
     
-    .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
+    .data-row { 
+        font-family: 'Courier New', monospace;
+        background-color: #262626; 
+        padding: 12px; 
+        border-radius: 8px; 
+        margin-bottom: 5px; 
+        border-left: 5px solid #3498db;
+        display: block;
+        white-space: pre;
+    }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
@@ -134,13 +143,11 @@ def finalize(disc_val, method):
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
             
-            # --- ΕΝΗΜΕΡΩΣΗ ΑΠΟΘΕΜΑΤΟΣ ---
             if i['bc'] != 'VOICE':
                 res_inv = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res_inv.data:
-                    new_stock = max(0, int(res_inv.data[0]['stock']) - 1)
+                    new_stock = int(res_inv.data[0]['stock']) - 1
                     supabase.table("inventory").update({"stock": new_stock}).eq("barcode", i['bc']).execute()
-            # ----------------------------
 
         st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons()
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
@@ -299,14 +306,13 @@ else:
         b = c1.text_input("BC", key="inv_bc")
         n = c2.text_input("Όνομα", key="inv_name")
         p = c3.number_input("Τιμή", min_value=0.0, key="inv_price")
-        s = c4.number_input("Stock", min_value=0, key="inv_stock")
+        s = c4.number_input("Stock", min_value=-999, key="inv_stock")
         if st.button("Προσθήκη", use_container_width=True):
             if b and n:
                 try:
                     supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
                     st.success("Το είδος αποθηκεύτηκε!")
-                    time.sleep(0.5)
-                    st.rerun()
+                    time.sleep(0.5); st.rerun()
                 except Exception as e: st.error(f"Σφάλμα: {e}")
             else: st.warning("Συμπληρώστε BC και Όνομα.")
         st.divider()
@@ -322,9 +328,15 @@ else:
             csv = f_df[['barcode', 'name', 'price', 'stock']].to_csv(index=False).encode('utf-8-sig')
             c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"inventory_{date.today()}.csv", mime='text/csv', use_container_width=True)
             st.divider()
+            
+            # --- ΣΤΟΙΧΙΣΜΕΝΗ ΛΙΣΤΑ ΠΡΟΪΟΝΤΩΝ ---
             for _, r in f_df.iterrows():
                 col1, col2 = st.columns([5, 1])
-                with col1: st.markdown(f"<div class='data-row'>📦 {r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+                stk_color = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
+                # Χρήση σταθερών αποστάσεων (padding) για κάθετη στοίχιση
+                item_text = f"📦 {str(r['barcode']):<8} | {r['name'][:25]:<25} | {float(r['price']):>6.2f}€ | Stock: <span style='color:{stk_color};'>{r['stock']}</span>"
+                with col1: 
+                    st.markdown(f"<div class='data-row'>{item_text}</div>", unsafe_allow_html=True)
                 with col2:
                     if st.button("❌", key=f"inv_{r['barcode']}", use_container_width=True): 
                         supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
@@ -349,4 +361,4 @@ else:
                 with col2:
                     if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
                 with col3:
-                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute();
