@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.80) ---
-st.set_page_config(page_title="CHERRY v14.0.80", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.82) ---
+st.set_page_config(page_title="CHERRY v14.0.82", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 18000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 20000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -104,7 +104,6 @@ def finalize(disc_val, method):
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
         
-        # Εμφάνιση μηνύματος και ηχητικά εφέ
         st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ")
         st.balloons()
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
@@ -123,8 +122,9 @@ def payment_popup():
     opt = st.radio("Επιλογή", ["ΟΧΙ", "ΝΑΙ"], horizontal=True, label_visibility="collapsed")
     disc = 0.0
     if opt == "ΝΑΙ":
-        # Προσθήκη λεκτικού "Δώστε ποσό ή ποσοστό %"
-        inp = st.text_input("Δώστε ποσό ή ποσοστό %")
+        # Εμφάνιση του λεκτικού "Δώστε ποσό ή ποσοστό %" και ως τίτλο και ως placeholder
+        st.write("Δώστε ποσό ή ποσοστό %")
+        inp = st.text_input("Ποσό ή ποσοστό %", label_visibility="collapsed", placeholder="π.χ. 5 ή 10%")
         if inp:
             try:
                 if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
@@ -153,7 +153,7 @@ else:
             if text:
                 raw_query = text.lower().strip()
                 numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
-                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
+                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "έντεκα":11, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
                 found_price = float(numbers[0]) if numbers else next((float(v) for k, v in num_map.items() if k in raw_query), None)
                 
                 if found_price:
