@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.02) ---
-st.set_page_config(page_title="CHERRY v14.2.02", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.03) ---
+st.set_page_config(page_title="CHERRY v14.2.03", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -230,13 +230,19 @@ else:
 
     elif view == "📊 MANAGER" and supabase:
         st.title("📊 Αναφορές")
-        res = supabase.table("sales").select("*").execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
+        # Fetch sales and customers to join names
+        res_s = supabase.table("sales").select("*").execute()
+        res_c = supabase.table("customers").select("id, name").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
+            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
+            
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             today_date = get_athens_now().date()
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
+            
             with t1:
                 tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
                 if not tdf.empty:
@@ -247,7 +253,8 @@ else:
                     c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{tdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο ημέρας</div></div>""", unsafe_allow_html=True)
                     tdf['ΠΡΑΞΗ'] = tdf.groupby('s_date').ngroup() + 1
-                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+            
             with t2:
                 cs, ce = st.columns(2); sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
@@ -264,7 +271,7 @@ else:
                         day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
                         st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
-                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
@@ -278,7 +285,6 @@ else:
                     except Exception as e: st.error(f"Σφάλμα: {e}")
                 else: st.warning("Συμπληρώστε BC και Όνομα.")
         
-        # Λίστα & Αναζήτηση Ειδών
         res = supabase.table("inventory").select("*").execute()
         if res.data:
             df_inv = pd.DataFrame(res.data)
@@ -289,10 +295,8 @@ else:
             if s_n: f_df = f_df[f_df['name'].str.contains(s_n.upper(), na=False)]
             if s_b: f_df = f_df[f_df['barcode'].str.contains(s_b, na=False)]
             f_df = f_df.sort_values(by='name', ascending=True)
-            
             csv = f_df[['barcode', 'name', 'price', 'stock']].to_csv(index=False).encode('utf-8-sig')
             c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"inventory_{date.today()}.csv", mime='text/csv', use_container_width=True)
-            
             st.divider()
             for _, r in f_df.iterrows():
                 col1, col2 = st.columns([5, 1])
