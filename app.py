@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.06) ---
-st.set_page_config(page_title="CHERRY v14.2.06", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.03) ---
+st.set_page_config(page_title="CHERRY v14.2.03", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -44,8 +44,7 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
-    .day-header { background-color: #34495e; color: #ffffff; padding: 8px; border-radius: 5px; margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-left: 10px solid #f1c40f; font-size: 13px; }
-    .day-header-main { color: #f1c40f; font-size: 16px; margin-right: 10px; }
+    .day-header { background-color: #34495e; color: #f1c40f; padding: 5px 10px; border-radius: 5px; margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-left: 5px solid #f1c40f; }
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
     </style>
@@ -246,4 +245,45 @@ else:
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
                     c1, c2, c3 = st.columns(3)
                     c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c2.markdown
+                    c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
+                    c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{tdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο ημέρας</div></div>""", unsafe_allow_html=True)
+                    tdf['ΠΡΑΞΗ'] = tdf.groupby('s_date').ngroup() + 1
+                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+            with t2:
+                cs, ce = st.columns(2); sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
+                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
+                if not pdf.empty:
+                    st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
+                    all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
+                    for day in all_days:
+                        st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
+                        day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
+                        day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
+                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        with st.form("inv_f", clear_on_submit=True):
+            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=0)
+            if st.form_submit_button("Προσθήκη"):
+                if b and n:
+                    try:
+                        supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                        st.success("Το είδος αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+                    except Exception as e: st.error(f"Σφάλμα: {e}")
+                else: st.warning("Συμπληρώστε BC και Όνομα.")
+        res = supabase.table("inventory").select("*").execute()
+        if res.data:
+            df_inv = pd.DataFrame(res.data)
+            c1, c2, c3 = st.columns([2, 2, 1])
+            s_n, s_b = c1.text_input("🔍 Όνομα", placeholder="Αναζήτηση..."), c2.text_input("🔢 Barcode", placeholder="Αναζήτηση...")
+            f_df = df_inv.copy()
+            if s_n: f_df = f_df[f_df['name'].str.contains(s_n.upper(), na=False)]
+            if s_b: f_df = f_df[f_df['barcode'].str.contains(s_b, na=False)]
+            f_df = f_df.sort_values(by='name', ascending=True)
+            csv = f_df[['barcode', 'name', 'price', 'stock']].to_csv(index=False).encode('utf-8-sig')
+            c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"inventory_{date.today()}.csv", mime='text/csv', use_container_width=True)
+            st.divider()
+            for _, r in f_df.iterrows():
+                col1, col2 = st.columns([5, 1])
+                with col1: st
