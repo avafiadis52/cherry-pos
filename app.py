@@ -233,6 +233,4 @@ else:
                 if not pdf.empty:
                     m_p, c_p = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].
+                    c1, c
