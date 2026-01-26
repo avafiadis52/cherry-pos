@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.16) ---
-st.set_page_config(page_title="CHERRY v14.2.16", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.17) ---
+st.set_page_config(page_title="CHERRY v14.2.17", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -38,7 +38,16 @@ st.markdown("""
     .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
-    div.stButton > button { background-color: #d3d3d3 !important; color: #808080 !important; border-radius: 8px !important; font-weight: bold !important; }
+    
+    /* Στυλ για όλα τα κουμπιά ώστε να μοιάζουν με τα placeholders (γκρι φόντο, γκρι γράμματα) */
+    div.stButton > button, div.stFormSubmitButton > button { 
+        background-color: #d3d3d3 !important; 
+        color: #808080 !important; 
+        border-radius: 8px !important; 
+        font-weight: bold !important; 
+        border: 1px solid #808080 !important;
+    }
+    
     .data-row { background-color: #262626; padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
@@ -307,4 +316,18 @@ else:
         if res.data:
             df_cust = pd.DataFrame(res.data)
             c1, c2, c3 = st.columns([2, 2, 1])
-            s_n, s_p = c1.text_input
+            s_n, s_p = c1.text_input("🔍 Όνομα", placeholder="Αναζήτηση..."), c2.text_input("📞 Τηλέφωνο", placeholder="Αναζήτηση...")
+            f_df = df_cust.copy()
+            if s_n: f_df = f_df[f_df['name'].str.contains(s_n.upper(), na=False)]
+            if s_p: f_df = f_df[f_df['phone'].str.contains(s_p, na=False)]
+            f_df = f_df.sort_values(by='name', ascending=True)
+            csv = f_df[['name', 'phone']].to_csv(index=False).encode('utf-8-sig')
+            c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"customers_{date.today()}.csv", mime='text/csv', use_container_width=True)
+            st.divider()
+            for _, r in f_df.iterrows():
+                col1, col2, col3 = st.columns([4, 1, 1])
+                with col1: st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+                with col2:
+                    if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
+                with col3:
+                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
