@@ -186,8 +186,11 @@ else:
                             st.rerun()
                         else:
                             new_customer_popup(clean_ph)
-                    elif len(clean_ph) > 10:
+                    else:
+                        speak_text("Λάθος τηλέφωνο")
                         st.error("Το τηλέφωνο πρέπει να έχει ακριβώς 10 ψηφία.")
+                        time.sleep(1)
+                        st.session_state.ph_key += 1; st.rerun()
                 
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
@@ -201,7 +204,6 @@ else:
                     else: 
                         speak_text(f"Barcode {bc} όχι")
                         st.error(f"Barcode {bc} όχι!")
-                        # Καθαρισμός πεδίου για να επιτρέψει δεύτερη συνεχόμενη λάθος προσπάθεια
                         time.sleep(1)
                         st.session_state.bc_key += 1; st.rerun()
 
