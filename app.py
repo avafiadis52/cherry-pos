@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.08) ---
-st.set_page_config(page_title="CHERRY v14.2.08", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.09) ---
+st.set_page_config(page_title="CHERRY v14.2.09", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -274,4 +274,19 @@ else:
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
                         st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
-    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase
+    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        with st.form("inv_f", clear_on_submit=True):
+            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=0)
+            if st.form_submit_button("Προσθήκη"):
+                if b and n:
+                    try:
+                        supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                        st.success("Το είδος αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+                    except Exception as e: st.error(f"Σφάλμα: {e}")
+                else: st.warning("Συμπληρώστε BC και Όνομα.")
+        res = supabase.table("inventory").select("*").execute()
+        if res.data:
+            df_inv = pd.DataFrame(res.data)
+            c1, c2, c3 = st.columns([2, 2, 1])
+            s
