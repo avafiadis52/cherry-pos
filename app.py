@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.17) ---
-st.set_page_config(page_title="CHERRY v14.2.17", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.18) ---
+st.set_page_config(page_title="CHERRY v14.2.18", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -39,8 +39,7 @@ st.markdown("""
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
     
-    /* Στυλ για όλα τα κουμπιά ώστε να μοιάζουν με τα placeholders (γκρι φόντο, γκρι γράμματα) */
-    div.stButton > button, div.stFormSubmitButton > button { 
+    div.stButton > button { 
         background-color: #d3d3d3 !important; 
         color: #808080 !important; 
         border-radius: 8px !important; 
@@ -134,7 +133,7 @@ def finalize(disc_val, method):
             f = round(i['price'] - d, 2)
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
-        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons()
+        st.success("✅ ΕΠΙΤΥΗΣ ΠΛΗΡΩΜΗ"); st.balloons()
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         time.sleep(1.5); reset_app()
@@ -282,15 +281,26 @@ else:
 
     elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
-        with st.form("inv_f", clear_on_submit=True):
-            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=0)
-            if st.form_submit_button("Προσθήκη", use_container_width=True):
-                if b and n:
-                    try:
-                        supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
-                        st.success("Το είδος αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
-                    except Exception as e: st.error(f"Σφάλμα: {e}")
-                else: st.warning("Συμπληρώστε BC και Όνομα.")
+        
+        # ΠΕΔΙΑ ΕΙΣΑΓΩΓΗΣ (Εκτός φόρμας για να μην πιάνει το Enter)
+        c1,c2,c3,c4 = st.columns(4)
+        b = c1.text_input("BC", key="inv_bc")
+        n = c2.text_input("Όνομα", key="inv_name")
+        p = c3.number_input("Τιμή", min_value=0.0, key="inv_price")
+        s = c4.number_input("Stock", min_value=0, key="inv_stock")
+        
+        # ΚΟΥΜΠΙ ΠΡΟΣΘΗΚΗΣ (Το μόνο που κάνει την καταχώρηση)
+        if st.button("Προσθήκη", use_container_width=True):
+            if b and n:
+                try:
+                    supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                    st.success("Το είδος αποθηκεύτηκε!")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception as e: st.error(f"Σφάλμα: {e}")
+            else: st.warning("Συμπληρώστε BC και Όνομα.")
+            
+        st.divider()
         res = supabase.table("inventory").select("*").execute()
         if res.data:
             df_inv = pd.DataFrame(res.data)
