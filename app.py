@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.18) ---
-st.set_page_config(page_title="CHERRY v14.2.18", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.19) ---
+st.set_page_config(page_title="CHERRY v14.2.19", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -133,7 +133,7 @@ def finalize(disc_val, method):
             f = round(i['price'] - d, 2)
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
-        st.success("✅ ΕΠΙΤΥΗΣ ΠΛΗΡΩΜΗ"); st.balloons()
+        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons()
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         time.sleep(1.5); reset_app()
@@ -266,6 +266,15 @@ else:
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
                 if not pdf.empty:
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
+                    
+                    # --- ΠΡΟΣΘΗΚΗ ΣΥΓΚΕΝΤΡΩΤΙΚΩΝ ΣΤΟΙΧΕΙΩΝ ΠΕΡΙΟΔΟΥ ---
+                    pm_all, pc_all = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
+                    col1, col2, col3 = st.columns(3)
+                    col1.markdown(f"""<div class='report-stat' style='background-color:#1e1e1e;'>💵 Μετρητά<div class='stat-val'>{pm_all['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({pm_all['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
+                    col2.markdown(f"""<div class='report-stat' style='background-color:#1e1e1e;'>💳 Κάρτα<div class='stat-val'>{pc_all['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({pc_all['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
+                    col3.markdown(f"""<div class='report-stat' style='background-color:#1e1e1e;'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
+                    # --------------------------------------------------
+
                     all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
                     for day in all_days:
                         st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
@@ -281,15 +290,11 @@ else:
 
     elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
-        
-        # ΠΕΔΙΑ ΕΙΣΑΓΩΓΗΣ (Εκτός φόρμας για να μην πιάνει το Enter)
         c1,c2,c3,c4 = st.columns(4)
         b = c1.text_input("BC", key="inv_bc")
         n = c2.text_input("Όνομα", key="inv_name")
         p = c3.number_input("Τιμή", min_value=0.0, key="inv_price")
         s = c4.number_input("Stock", min_value=0, key="inv_stock")
-        
-        # ΚΟΥΜΠΙ ΠΡΟΣΘΗΚΗΣ (Το μόνο που κάνει την καταχώρηση)
         if st.button("Προσθήκη", use_container_width=True):
             if b and n:
                 try:
@@ -299,7 +304,6 @@ else:
                     st.rerun()
                 except Exception as e: st.error(f"Σφάλμα: {e}")
             else: st.warning("Συμπληρώστε BC και Όνομα.")
-            
         st.divider()
         res = supabase.table("inventory").select("*").execute()
         if res.data:
