@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.05) ---
-st.set_page_config(page_title="CHERRY v14.2.05", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.06) ---
+st.set_page_config(page_title="CHERRY v14.2.06", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -44,8 +44,8 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
-    .day-header { background-color: #34495e; color: #ffffff; padding: 10px; border-radius: 5px; margin-top: 25px; margin-bottom: 10px; font-weight: bold; border-left: 10px solid #f1c40f; font-size: 14px; line-height: 1.6; }
-    .day-header-main { color: #f1c40f; font-size: 18px; margin-right: 15px; }
+    .day-header { background-color: #34495e; color: #ffffff; padding: 8px; border-radius: 5px; margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-left: 10px solid #f1c40f; font-size: 13px; }
+    .day-header-main { color: #f1c40f; font-size: 16px; margin-right: 10px; }
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
     </style>
@@ -246,4 +246,4 @@ else:
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
                     c1, c2, c3 = st.columns(3)
                     c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
+                    c2.markdown
