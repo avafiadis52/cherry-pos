@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.90) ---
-st.set_page_config(page_title="CHERRY v14.0.90", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.1.00) ---
+st.set_page_config(page_title="CHERRY v14.1.00", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -101,6 +101,17 @@ def new_customer_popup(phone):
                     st.rerun()
             except Exception as e: st.error(f"Σφάλμα: {e}")
         else: st.warning("Παρακαλώ δώστε όνομα.")
+
+@st.dialog("📝 Επεξεργασία Πελάτη")
+def edit_customer_popup(customer):
+    new_name = st.text_input("Όνομα", value=customer['name'])
+    new_phone = st.text_input("Τηλέφωνο", value=customer['phone'])
+    if st.button("Αποθήκευση Αλλαγών", use_container_width=True):
+        try:
+            supabase.table("customers").update({"name": new_name.upper(), "phone": new_phone}).eq("id", customer['id']).execute()
+            st.success("Οι αλλαγές αποθηκεύτηκαν!")
+            time.sleep(1); st.rerun()
+        except Exception as e: st.error(f"Σφάλμα: {e}")
 
 def finalize(disc_val, method):
     if not supabase: return
@@ -264,6 +275,13 @@ else:
             if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
 
     elif view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        st.title("👥 Διαχείριση Πελατών")
         for r in supabase.table("customers").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+            c1, c2, c3 = st.columns([4, 1, 1])
+            with c1:
+                st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+            with c2:
+                if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
+            with c3:
+                if st.button("❌", key=f"c_{r['id']}", use_container_width=True): 
+                    supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
