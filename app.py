@@ -239,7 +239,7 @@ else:
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             today_date = get_athens_now().date()
             
-            # Backup Button for Manager
+            # Backup Button
             csv_backup = df.to_csv(index=False).encode('utf-8-sig')
             st.download_button("📥 BACKUP ALL SALES (CSV)", data=csv_backup, file_name=f"all_sales_{today_date}.csv", mime="text/csv", use_container_width=True)
             st.divider()
@@ -274,27 +274,4 @@ else:
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
                         st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
-    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
-        st.title("📦 Διαχείριση Αποθήκης")
-        with st.form("inv_f", clear_on_submit=True):
-            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=0)
-            if st.form_submit_button("Προσθήκη"):
-                if b and n:
-                    try:
-                        supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
-                        st.success("Το είδος αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
-                    except Exception as e: st.error(f"Σφάλμα: {e}")
-                else: st.warning("Συμπληρώστε BC και Όνομα.")
-        res = supabase.table("inventory").select("*").execute()
-        if res.data:
-            df_inv = pd.DataFrame(res.data)
-            c1, c2, c3 = st.columns([2, 2, 1])
-            s_n, s_b = c1.text_input("🔍 Όνομα", placeholder="Αναζήτηση..."), c2.text_input("🔢 Barcode", placeholder="Αναζήτηση...")
-            f_df = df_inv.copy()
-            if s_n: f_df = f_df[f_df['name'].str.contains(s_n.upper(), na=False)]
-            if s_b: f_df = f_df[f_df['barcode'].str.contains(s_b, na=False)]
-            f_df = f_df.sort_values(by='name', ascending=True)
-            csv = f_df[['barcode', 'name', 'price', 'stock']].to_csv(index=False).encode('utf-8-sig')
-            c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"inventory_{date.today()}.csv", mime='text/csv', use_container_width=True)
-            st.divider()
-            for _, r
+    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase
