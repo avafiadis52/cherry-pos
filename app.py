@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.87) ---
-st.set_page_config(page_title="CHERRY v14.0.87", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.88) ---
+st.set_page_config(page_title="CHERRY v14.0.88", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 25000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 26000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -145,7 +145,9 @@ else:
                     for w in ["ευρώ", "ευρω", "τιμή", "τιμη"] + list(num_map.keys()): clean_name = clean_name.replace(w, "")
                     st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': found_price})
                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
-                else: speak_text("Δεν κατάλαβα"); st.warning("Σφάλμα: Δεν βρέθηκε τιμή.")
+                else: 
+                    speak_text("Δεν κατάλαβα")
+                    st.warning("Σφάλμα: Δεν βρέθηκε το είδος") # Αλλαγή 1
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True): st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -207,8 +209,9 @@ else:
                     c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
-                    pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
-                    st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                    # Αλλαγή 2: Αρίθμηση πράξεων ανά ημέρα πώλησης
+                    pdf['ΠΡΑΞΗ'] = pdf.groupby(['ΗΜΕΡΟΜΗΝΙΑ', 's_date']).ngroup().groupby(pdf['ΗΜΕΡΟΜΗΝΙΑ']).cumcount() + 1
+                    st.dataframe(pdf[['ΗΜΕΡΟΜΗΝΙΑ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date'], ascending=[False, False]), use_container_width=True, hide_index=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         with st.form("inv_f", clear_on_submit=True):
