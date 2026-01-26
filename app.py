@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.82) ---
-st.set_page_config(page_title="CHERRY v14.0.82", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.83) ---
+st.set_page_config(page_title="CHERRY v14.0.83", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 20000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 21000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -122,7 +122,6 @@ def payment_popup():
     opt = st.radio("Επιλογή", ["ΟΧΙ", "ΝΑΙ"], horizontal=True, label_visibility="collapsed")
     disc = 0.0
     if opt == "ΝΑΙ":
-        # Εμφάνιση του λεκτικού "Δώστε ποσό ή ποσοστό %" και ως τίτλο και ως placeholder
         st.write("Δώστε ποσό ή ποσοστό %")
         inp = st.text_input("Ποσό ή ποσοστό %", label_visibility="collapsed", placeholder="π.χ. 5 ή 10%")
         if inp:
@@ -216,12 +215,23 @@ else:
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             today_date = get_athens_now().date()
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
+            
             with t1:
                 today_df = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
                 if not today_df.empty:
-                    today_df['ΠΡΑΞΗ'] = today_df.groupby('s_date').ngroup() + 1
+                    m_today = today_df[today_df['method'] == 'Μετρητά']
+                    c_today = today_df[today_df['method'] == 'Κάρτα']
+                    
                     st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{today_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_today['s_date'].nunique()} πράξεις)</div></div>", unsafe_allow_html=True)
+                    col2.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_today['s_date'].nunique()} πράξεις)</div></div>", unsafe_allow_html=True)
+                    col3.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{today_df['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο ημέρας</div></div>", unsafe_allow_html=True)
+                    
+                    today_df['ΠΡΑΞΗ'] = today_df.groupby('s_date').ngroup() + 1
                     st.dataframe(today_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+            
             with t2:
                 col_s, col_e = st.columns(2)
                 sd, ed = col_s.date_input("Από", today_date-timedelta(days=7)), col_e.date_input("Έως", today_date)
