@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.21) ---
-st.set_page_config(page_title="CHERRY v14.2.21", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.22) ---
+st.set_page_config(page_title="CHERRY v14.2.22", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -328,15 +328,11 @@ else:
             csv = f_df[['barcode', 'name', 'price', 'stock']].to_csv(index=False).encode('utf-8-sig')
             c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"inventory_{date.today()}.csv", mime='text/csv', use_container_width=True)
             st.divider()
-            
-            # --- ΣΤΟΙΧΙΣΜΕΝΗ ΛΙΣΤΑ ΠΡΟΪΟΝΤΩΝ ---
             for _, r in f_df.iterrows():
                 col1, col2 = st.columns([5, 1])
                 stk_color = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
-                # Χρήση σταθερών αποστάσεων (padding) για κάθετη στοίχιση
                 item_text = f"📦 {str(r['barcode']):<8} | {r['name'][:25]:<25} | {float(r['price']):>6.2f}€ | Stock: <span style='color:{stk_color};'>{r['stock']}</span>"
-                with col1: 
-                    st.markdown(f"<div class='data-row'>{item_text}</div>", unsafe_allow_html=True)
+                with col1: st.markdown(f"<div class='data-row'>{item_text}</div>", unsafe_allow_html=True)
                 with col2:
                     if st.button("❌", key=f"inv_{r['barcode']}", use_container_width=True): 
                         supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
@@ -355,10 +351,14 @@ else:
             csv = f_df[['name', 'phone']].to_csv(index=False).encode('utf-8-sig')
             c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"customers_{date.today()}.csv", mime='text/csv', use_container_width=True)
             st.divider()
+            
+            # --- ΣΤΟΙΧΙΣΜΕΝΗ ΛΙΣΤΑ ΠΕΛΑΤΩΝ ---
             for _, r in f_df.iterrows():
                 col1, col2, col3 = st.columns([4, 1, 1])
-                with col1: st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+                # Σταθερή στοίχιση για το Όνομα (30 χαρακτήρες) και το Τηλέφωνο
+                cust_text = f"👤 {r['name'][:30]:<30} | 📞 {r['phone']}"
+                with col1: st.markdown(f"<div class='data-row'>{cust_text}</div>", unsafe_allow_html=True)
                 with col2:
                     if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
                 with col3:
-                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute();
+                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
