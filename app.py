@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.79) ---
-st.set_page_config(page_title="CHERRY v14.0.79", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.80) ---
+st.set_page_config(page_title="CHERRY v14.0.80", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 17000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 18000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -103,7 +103,15 @@ def finalize(disc_val, method):
             f = round(i['price'] - d, 2)
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
-        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ"); st.balloons(); play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3"); time.sleep(1); reset_app()
+        
+        # Εμφάνιση μηνύματος και ηχητικά εφέ
+        st.success("✅ ΕΠΙΤΥΧΗΣ ΠΛΗΡΩΜΗ")
+        st.balloons()
+        speak_text("Επιτυχής Πληρωμή", play_beep=False)
+        play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
+        
+        time.sleep(1.5)
+        reset_app()
     except Exception as e: st.error(f"Σφάλμα: {e}")
 
 @st.dialog("💰 Πληρωμή")
@@ -115,7 +123,8 @@ def payment_popup():
     opt = st.radio("Επιλογή", ["ΟΧΙ", "ΝΑΙ"], horizontal=True, label_visibility="collapsed")
     disc = 0.0
     if opt == "ΝΑΙ":
-        inp = st.text_input("Ποσό ή %")
+        # Προσθήκη λεκτικού "Δώστε ποσό ή ποσοστό %"
+        inp = st.text_input("Δώστε ποσό ή ποσοστό %")
         if inp:
             try:
                 if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
