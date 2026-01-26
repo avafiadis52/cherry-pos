@@ -26,7 +26,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.07) ---
+# --- 3. CONFIG & STYLE (Version v14.2.07 - Fixed Syntax) ---
 st.set_page_config(page_title="CHERRY v14.2.07", layout="wide", page_icon="🍒")
 
 st.markdown("""
@@ -219,48 +219,4 @@ else:
                         st.session_state.bc_key += 1; st.rerun()
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
-                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
-            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
-        with cr:
-            total = sum(i['price'] for i in st.session_state.cart)
-            lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
-            st.markdown(f"<div class='cart-area'>{'Είδος':<20} | {'Τιμή':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
-
-    elif view == "📊 MANAGER" and supabase:
-        st.title("📊 Αναφορές")
-        res_s = supabase.table("sales").select("*").execute()
-        res_c = supabase.table("customers").select("id, name").execute()
-        if res_s.data:
-            df = pd.DataFrame(res_s.data)
-            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
-            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
-            df['s_date_dt'] = pd.to_datetime(df['s_date'])
-            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
-            today_date = get_athens_now().date()
-            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
-            with t1:
-                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
-                if not tdf.empty:
-                    m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
-                    st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_t['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_t['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{tdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο ημέρας</div></div>""", unsafe_allow_html=True)
-                    tdf['ΠΡΑΞΗ'] = tdf.groupby('s_date').ngroup() + 1
-                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
-            with t2:
-                cs, ce = st.columns(2); sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
-                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
-                if not pdf.empty:
-                    st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
-                    all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
-                    for day in all_days:
-                        st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
-                        day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
-                        m_d, c_d = day_df[day_df['method'] == 'Μετρητά'], day_df[day_df['method'] == 'Κάρτα']
-                        st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:32px;'>{day_df['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
-                        cc1, cc2, cc3 = st.columns(3)
-                        cc1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_d['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_d['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                        cc2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_d['final_item_price'].sum():.2f}€</div><div class='
+                if st.session_state.cart and st.button("💰 Π
