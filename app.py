@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.1.00) ---
-st.set_page_config(page_title="CHERRY v14.1.00", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.00) ---
+st.set_page_config(page_title="CHERRY v14.2.00", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -257,69 +257,4 @@ else:
                     c1, c2, c3 = st.columns(3)
                     c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
-                    c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
-                    
-                    all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
-                    for day in all_days:
-                        day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
-                        st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
-                        day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
-                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
-
-    elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
-        with st.form("inv_f", clear_on_submit=True):
-            c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή"), c4.number_input("Stock")
-            if st.form_submit_button("Προσθήκη") and b and n: supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
-        for r in supabase.table("inventory").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
-            if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif view == "👥 ΠΕΛΑΤΕΣ" and supabase:
-        st.title("👥 Διαχείριση Πελατών")
-        
-        # Λήψη δεδομένων και μετατροπή σε DataFrame για ευκολότερη διαχείριση
-        res = supabase.table("customers").select("*").execute()
-        if res.data:
-            df_cust = pd.DataFrame(res.data)
-            
-            # Φίλτρα Αναζήτησης
-            c1, c2, c3 = st.columns([2, 2, 1])
-            search_name = c1.text_input("🔍 Αναζήτηση Ονόματος", placeholder="Πληκτρολογήστε όνομα...")
-            search_phone = c2.text_input("📞 Αναζήτηση Τηλεφώνου", placeholder="Πληκτρολογήστε τηλέφωνο...")
-            
-            # Φιλτράρισμα και Αλφαβητική Ταξινόμηση
-            filtered_df = df_cust.copy()
-            if search_name:
-                filtered_df = filtered_df[filtered_df['name'].str.contains(search_name.upper(), na=False)]
-            if search_phone:
-                filtered_df = filtered_df[filtered_df['phone'].str.contains(search_phone, na=False)]
-            
-            filtered_df = filtered_df.sort_values(by='name', ascending=True)
-            
-            # Δυνατότητα Εκτύπωσης (Εξαγωγή CSV)
-            csv = filtered_df[['name', 'phone']].to_csv(index=False).encode('utf-8-sig')
-            c3.download_button(
-                label="📥 ΕΚΤΥΠΩΣΗ (CSV)",
-                data=csv,
-                file_name=f"customers_list_{date.today()}.csv",
-                mime='text/csv',
-                use_container_width=True
-            )
-            
-            st.divider()
-            
-            # Εμφάνιση Λίστας
-            if not filtered_df.empty:
-                for _, r in filtered_df.iterrows():
-                    col1, col2, col3 = st.columns([4, 1, 1])
-                    with col1:
-                        st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-                    with col2:
-                        if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
-                    with col3:
-                        if st.button("❌", key=f"c_{r['id']}", use_container_width=True): 
-                            supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-            else:
-                st.info("Δεν βρέθηκαν πελάτες με αυτά τα κριτήρια.")
-        else:
-            st.info("Δεν υπάρχουν καταχωρημένοι πελάτες στη βάση.")
+                    c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='
