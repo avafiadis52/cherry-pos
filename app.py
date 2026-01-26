@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.88) ---
-st.set_page_config(page_title="CHERRY v14.0.88", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.89) ---
+st.set_page_config(page_title="CHERRY v14.0.89", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -44,6 +44,7 @@ st.markdown("""
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
+    .day-header { background-color: #34495e; color: #f1c40f; padding: 8px; border-radius: 5px; margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-left: 10px solid #f1c40f; }
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
     </style>
@@ -56,7 +57,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 26000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 27000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -147,7 +148,7 @@ else:
                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
                 else: 
                     speak_text("Δεν κατάλαβα")
-                    st.warning("Σφάλμα: Δεν βρέθηκε το είδος") # Αλλαγή 1
+                    st.warning("Σφάλμα: Δεν βρέθηκε το είδος")
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True): st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -201,7 +202,7 @@ else:
                     st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
             with t2:
                 cs, ce = st.columns(2); sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
-                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt')
+                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
                 if not pdf.empty:
                     m_p, c_p = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
@@ -209,9 +210,15 @@ else:
                     c1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
-                    # Αλλαγή 2: Αρίθμηση πράξεων ανά ημέρα πώλησης
-                    pdf['ΠΡΑΞΗ'] = pdf.groupby(['ΗΜΕΡΟΜΗΝΙΑ', 's_date']).ngroup().groupby(pdf['ΗΜΕΡΟΜΗΝΙΑ']).cumcount() + 1
-                    st.dataframe(pdf[['ΗΜΕΡΟΜΗΝΙΑ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date'], ascending=[False, False]), use_container_width=True, hide_index=True)
+                    
+                    # 2. Εμφάνιση εγγραφών ανά ημέρα χωριστά
+                    all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
+                    for day in all_days:
+                        day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
+                        st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
+                        # 1. Επαναφορά αναλυτικής απεικόνισης με ΠΡΑΞΗ
+                        day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
+                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         with st.form("inv_f", clear_on_submit=True):
