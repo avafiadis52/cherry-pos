@@ -195,8 +195,16 @@ else:
                 bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
                 if bc and supabase:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
-                    if res.data: st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': float(res.data[0]['price'])}); st.session_state.bc_key += 1; st.rerun()
-                    else: speak_text("Όχι"); st.error(f"Barcode {bc} όχι!")
+                    if res.data: 
+                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': float(res.data[0]['price'])})
+                        st.session_state.bc_key += 1; st.rerun()
+                    else: 
+                        speak_text(f"Barcode {bc} όχι")
+                        st.error(f"Barcode {bc} όχι!")
+                        # Καθαρισμός πεδίου για να επιτρέψει δεύτερη συνεχόμενη λάθος προσπάθεια
+                        time.sleep(1)
+                        st.session_state.bc_key += 1; st.rerun()
+
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
                 if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
