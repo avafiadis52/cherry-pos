@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.78) ---
-st.set_page_config(page_title="CHERRY v14.0.78", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.79) ---
+st.set_page_config(page_title="CHERRY v14.0.79", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -56,7 +56,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 16000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 17000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -140,34 +140,17 @@ else:
         
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
-            text = speech_to_text(
-                language='el', 
-                start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", 
-                stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", 
-                just_once=True,
-                key=f"voice_{st.session_state.mic_key}"
-            )
-            
+            text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", just_once=True, key=f"voice_{st.session_state.mic_key}")
             if text:
                 raw_query = text.lower().strip()
-                st.write(f"Είπες: **{raw_query}**")
-                
                 numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
                 num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
-                
-                found_price = None
-                if numbers: found_price = float(numbers[0])
-                else:
-                    for word, val in num_map.items():
-                        if word in raw_query:
-                            found_price = float(val)
-                            break
+                found_price = float(numbers[0]) if numbers else next((float(v) for k, v in num_map.items() if k in raw_query), None)
                 
                 if found_price:
                     clean_name = raw_query
                     if numbers: clean_name = clean_name.replace(numbers[0], "")
-                    for w in ["ευρώ", "ευρω", "τιμή", "τιμη"]: clean_name = clean_name.replace(w, "")
-                    for word in num_map.keys(): clean_name = clean_name.replace(word, "")
+                    for w in ["ευρώ", "ευρω", "τιμή", "τιμη"] + list(num_map.keys()): clean_name = clean_name.replace(w, "")
                     final_name = clean_name.strip().upper() if clean_name.strip() else "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ"
                     st.session_state.cart.append({'bc': 'VOICE', 'name': final_name, 'price': found_price})
                     st.session_state.mic_key += 1
@@ -175,8 +158,6 @@ else:
                 else:
                     speak_text("Δεν κατάλαβα", play_beep=True)
                     st.warning("Σφάλμα: Δεν βρέθηκε τιμή.")
-        else:
-            st.info("Φωνητικές εντολές: Μη διαθέσιμες")
 
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
@@ -206,7 +187,6 @@ else:
                     else:
                         speak_text("", play_beep=True)
                         st.error(f"Το Barcode {bc} δεν βρέθηκε!")
-                        
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True):
                         st.session_state.cart.pop(idx); st.rerun()
@@ -231,25 +211,14 @@ else:
                 today_df = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
                 if not today_df.empty:
                     today_df['ΠΡΑΞΗ'] = today_df.groupby('s_date').ngroup() + 1
-                    m_today = today_df[today_df['method'] == 'Μετρητά']
-                    c_today = today_df[today_df['method'] == 'Κάρτα']
                     st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{today_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                    c_m, c_c, c_d = st.columns(3)
-                    c_m.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{m_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
-                    c_c.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_today['final_item_price'].sum():.2f}€</div><div class='stat-desc'>{c_today['s_date'].nunique()} πράξεις</div></div>", unsafe_allow_html=True)
-                    c_d.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{today_df['discount'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                     st.dataframe(today_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
-
             with t2:
                 col_s, col_e = st.columns(2)
                 sd, ed = col_s.date_input("Από", today_date-timedelta(days=7)), col_e.date_input("Έως", today_date)
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt')
                 if not pdf.empty:
                     pdf['ΠΡΑΞΗ'] = pdf.groupby('s_date').ngroup() + 1
-                    st.subheader("🗓️ Σύνολα ανά Ημέρα")
-                    daily_sum = pdf.groupby('ΗΜΕΡΟΜΗΝΙΑ').agg(Τζίρος=('final_item_price','sum'), Μετρητά=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Μετρητά'].sum()), Κάρτα=('final_item_price', lambda x: x[pdf.loc[x.index, 'method'] == 'Κάρτα'].sum()), Πράξεις=('s_date', 'nunique')).sort_index(ascending=False).reset_index()
-                    st.table(daily_sum)
-                    st.subheader("📑 Αναλυτικές Πράξεις Περιόδου")
                     st.dataframe(pdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif view == "📦 ΑΠΟΘΗΚΗ" and supabase:
@@ -257,4 +226,10 @@ else:
             c1,c2,c3,c4 = st.columns(4); b,n,p,s = c1.text_input("BC"), c2.text_input("Όνομα"), c3.number_input("Τιμή"), c4.number_input("Stock")
             if st.form_submit_button("Προσθήκη") and b and n: supabase.table("inventory").upsert({"barcode":b,"name":n,"price":p,"stock":s}).execute(); st.rerun()
         for r in supabase.table("inventory").select("*").execute().data:
-            st.markdown(f"<div class='data-row'>{r['barcode
+            st.markdown(f"<div class='data-row'>{r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"inv_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        for r in supabase.table("customers").select("*").execute().data:
+            st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+            if st.button("❌", key=f"c_{r['id']}"): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
