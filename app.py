@@ -26,7 +26,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.07 - Fixed Syntax) ---
+# --- 3. CONFIG & STYLE (Version v14.2.07) ---
 st.set_page_config(page_title="CHERRY v14.2.07", layout="wide", page_icon="🍒")
 
 st.markdown("""
@@ -219,4 +219,14 @@ else:
                         st.session_state.bc_key += 1; st.rerun()
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
-                if st.session_state.cart and st.button("💰 Π
+                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
+            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+        with cr:
+            total = sum(i['price'] for i in st.session_state.cart)
+            lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
+            st.markdown(f"<div class='cart-area'>{'Είδος':<20} | {'Τιμή':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+
+    elif view == "📊 MANAGER" and supabase:
+        st.title("📊 Αναφορές")
+        res_s = supabase.table("sales").select("*").execute()
