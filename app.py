@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.0.89) ---
-st.set_page_config(page_title="CHERRY v14.0.89", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.0.90) ---
+st.set_page_config(page_title="CHERRY v14.0.90", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -57,7 +57,7 @@ if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανι
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
-if 'mic_key' not in st.session_state: st.session_state.mic_key = 27000
+if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -158,6 +158,7 @@ else:
         cl, cr = st.columns([1, 1.5])
         with cl:
             if st.session_state.selected_cust_id is None:
+                # --- Εδώ είναι το πεδίο τηλεφώνου ---
                 ph = st.text_input("Τηλέφωνο", key=f"ph_{st.session_state.ph_key}")
                 if ph and len(ph) == 10 and supabase:
                     res = supabase.table("customers").select("*").eq("phone", ph).execute()
@@ -211,12 +212,10 @@ else:
                     c2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_p['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_p['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                     c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>""", unsafe_allow_html=True)
                     
-                    # 2. Εμφάνιση εγγραφών ανά ημέρα χωριστά
                     all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
                     for day in all_days:
                         day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
                         st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
-                        # 1. Επαναφορά αναλυτικής απεικόνισης με ΠΡΑΞΗ
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
                         st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
