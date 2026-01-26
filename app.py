@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.07) ---
-st.set_page_config(page_title="CHERRY v14.2.07", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.08) ---
+st.set_page_config(page_title="CHERRY v14.2.08", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -238,6 +238,12 @@ else:
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             today_date = get_athens_now().date()
+            
+            # Backup Button for Manager
+            csv_backup = df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 BACKUP ALL SALES (CSV)", data=csv_backup, file_name=f"all_sales_{today_date}.csv", mime="text/csv", use_container_width=True)
+            st.divider()
+
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
             with t1:
                 tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
@@ -259,14 +265,12 @@ else:
                     for day in all_days:
                         st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
                         day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
-                        
                         m_d, c_d = day_df[day_df['method'] == 'Μετρητά'], day_df[day_df['method'] == 'Κάρτα']
                         st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:32px;'>{day_df['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
                         cc1, cc2, cc3 = st.columns(3)
                         cc1.markdown(f"""<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_d['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({m_d['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                         cc2.markdown(f"""<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_d['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({c_d['s_date'].nunique()} πράξεις)</div></div>""", unsafe_allow_html=True)
                         cc3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{day_df['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο ημέρας</div></div>""", unsafe_allow_html=True)
-                        
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
                         st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
@@ -293,32 +297,4 @@ else:
             csv = f_df[['barcode', 'name', 'price', 'stock']].to_csv(index=False).encode('utf-8-sig')
             c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"inventory_{date.today()}.csv", mime='text/csv', use_container_width=True)
             st.divider()
-            for _, r in f_df.iterrows():
-                col1, col2 = st.columns([5, 1])
-                with col1: st.markdown(f"<div class='data-row'>📦 {r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
-                with col2:
-                    if st.button("❌", key=f"inv_{r['barcode']}", use_container_width=True): 
-                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif view == "👥 ΠΕΛΑΤΕΣ" and supabase:
-        st.title("👥 Διαχείριση Πελατών")
-        res = supabase.table("customers").select("*").execute()
-        if res.data:
-            df_cust = pd.DataFrame(res.data)
-            c1, c2, c3 = st.columns([2, 2, 1])
-            s_n, s_p = c1.text_input("🔍 Όνομα", placeholder="Αναζήτηση..."), c2.text_input("📞 Τηλέφωνο", placeholder="Αναζήτηση...")
-            f_df = df_cust.copy()
-            if s_n: f_df = f_df[f_df['name'].str.contains(s_n.upper(), na=False)]
-            if s_p: f_df = f_df[f_df['phone'].str.contains(s_p, na=False)]
-            f_df = f_df.sort_values(by='name', ascending=True)
-            csv = f_df[['name', 'phone']].to_csv(index=False).encode('utf-8-sig')
-            c3.download_button(label="📥 ΕΚΤΥΠΩΣΗ (CSV)", data=csv, file_name=f"customers_{date.today()}.csv", mime='text/csv', use_container_width=True)
-            st.divider()
-            for _, r in f_df.iterrows():
-                col1, col2, col3 = st.columns([4, 1, 1])
-                with col1: st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
-                with col2:
-                    if st.button("📝", key=f"edit_{r['id']}", use_container_width=True): edit_customer_popup(r)
-                with col3:
-                    if st.button("❌", key=f"c_{r['id']}", use_container_width=True): supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-        else: st.info("Δεν υπάρχουν πελάτες.")
+            for _, r
