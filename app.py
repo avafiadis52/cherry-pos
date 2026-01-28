@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.25) ---
-st.set_page_config(page_title="CHERRY v14.2.25", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.26) ---
+st.set_page_config(page_title="CHERRY v14.2.26", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -293,7 +293,7 @@ else:
             st.divider()
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
             with t1:
-                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].sort_values('s_date_dt')
+                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
                 if not tdf.empty:
                     m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
                     st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>""", unsafe_allow_html=True)
@@ -303,6 +303,7 @@ else:
                     c3.markdown(f"""<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{tdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο ημέρας</div></div>""", unsafe_allow_html=True)
                     tdf['ΠΡΑΞΗ'] = tdf.groupby('s_date').ngroup() + 1
                     st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                else: st.info("Δεν υπάρχουν πωλήσεις σήμερα.")
             with t2:
                 cs, ce = st.columns(2); sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False)
@@ -381,12 +382,10 @@ else:
             
             st.divider()
             for _, r in f_df.iterrows():
-                # Υπολογισμός πόντων από τις συνολικές πωλήσεις του πελάτη
                 c_sales = sales_data[sales_data['cust_id'] == r['id']]
                 pts = int(c_sales['final_item_price'].sum() // 10)
                 
                 col1, col2, col3, col4 = st.columns([4, 0.5, 0.5, 0.5])
-                # Στοιχισμένο κείμενο με όνομα, τηλέφωνο και πόντους
                 cust_text = f"👤 {r['name'][:25]:<25} | 📞 {r['phone']} | ⭐ {pts:<3} pts"
                 with col1: st.markdown(f"<div class='data-row'>{cust_text}</div>", unsafe_allow_html=True)
                 with col2:
