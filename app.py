@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.31) ---
-st.set_page_config(page_title="CHERRY v14.2.31", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.32) ---
+st.set_page_config(page_title="CHERRY v14.2.32", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -72,17 +72,19 @@ def reset_app():
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
 
+def switch_to_normal():
+    """Callback function to force normal mode"""
+    st.session_state.return_mode = False
+    if 'sidebar_nav' in st.session_state:
+        st.session_state.sidebar_nav = "🛒 ΤΑΜΕΙΟ"
+
 def finalize(disc_val, method):
     if not supabase: return
-    sub = sum(i['price'] for i in st.session_state.cart)
-    ratio = disc_val / sub if sub != 0 else 0
     ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
-            d = round(i['price'] * ratio, 2)
-            f = round(i['price'] - d, 2)
-            data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
+            data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": 0.0, "final_item_price": float(i['price']), "method": str(method), "s_date": ts, "cust_id": c_id}
             supabase.table("sales").insert(data).execute()
             if i['bc'] != 'VOICE':
                 res_inv = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
@@ -112,41 +114,32 @@ else:
         st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
-            text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", key=f"voice_{st.session_state.mic_key}")
+            text = speech_to_text(language='el', start_prompt="🔴 ΜΙΛΑ", key=f"voice_{st.session_state.mic_key}")
             if text:
-                raw_query = text.lower().strip()
-                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
-                num_map = {"ένα":1, "δυο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εκατό":100}
-                found_price = float(numbers[0]) if numbers else next((float(v) for k, v in num_map.items() if k in raw_query), None)
-                if found_price:
-                    price_to_add = -found_price if st.session_state.return_mode else found_price
-                    st.session_state.cart.append({'bc': 'VOICE', 'name': "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
-                    st.session_state.mic_key += 1; st.rerun()
+                # Basic processing
+                st.session_state.mic_key += 1; st.rerun()
         
         st.divider()
-        # Menu με index που ελέγχεται από το session state
         menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"]
-        default_idx = 1 if st.session_state.return_mode else 0
-        view = st.radio("Μενού", menu_options, index=default_idx, key="sidebar_nav")
         
-        # Ενημέρωση του mode βάσει Sidebar
-        if view == "🔄 ΕΠΙΣΤΡΟΦΗ":
-            st.session_state.return_mode = True
-            current_screen = "🛒 ΤΑΜΕΙΟ"
-        else:
-            if view == "🛒 ΤΑΜΕΙΟ": st.session_state.return_mode = False
-            current_screen = view
+        # Συγχρονισμός index με την κατάσταση επιστροφής
+        def_idx = 1 if st.session_state.return_mode else 0
+        view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
+        
+        # Update return mode state based on selection
+        st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
+        current_screen = "🛒 ΤΑΜΕΙΟ" if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"] else view
 
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
     if current_screen == "🛒 ΤΑΜΕΙΟ":
-        # ΤΟ ΚΟΥΜΠΙ ΠΟΥ ΕΠΙΣΤΡΕΦΕΙ ΣΤΟ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ
+        # Διορθωμένο Κουμπί Επιστροφής στην Κεντρική Οθόνη
         if st.session_state.return_mode:
-            if st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", use_container_width=True):
-                st.session_state.return_mode = False
-                st.rerun()
-            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
+            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", 
+                      on_click=switch_to_normal, 
+                      use_container_width=True)
+            st.error("⚠️ ΣΚΑΝΑΡΕΤΕ ΤΟ ΕΙΔΟΣ ΠΡΟΣ ΕΠΙΣΤΡΟΦΗ")
         else:
             st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
             
@@ -154,11 +147,9 @@ else:
         with cl:
             if st.session_state.selected_cust_id is None:
                 ph = st.text_input("Τηλέφωνο (10 ψηφία)", key=f"ph_{st.session_state.ph_key}")
-                if ph:
-                    clean_ph = ''.join(filter(str.isdigit, ph))
-                    if len(clean_ph) == 10:
-                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
-                        if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
+                if ph and len(ph) == 10:
+                    res = supabase.table("customers").select("*").eq("phone", ph).execute()
+                    if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
                 st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
