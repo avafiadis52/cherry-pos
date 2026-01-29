@@ -164,7 +164,6 @@ def finalize(disc_val, method):
             if i['bc'] != 'VOICE':
                 res_inv = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
                 if res_inv.data:
-                    # Αν η τιμή είναι αρνητική (επιστροφή), το απόθεμα αυξάνεται
                     change = 1 if f < 0 else -1
                     new_stock = int(res_inv.data[0]['stock']) + change
                     supabase.table("inventory").update({"stock": new_stock}).eq("barcode", i['bc']).execute()
@@ -238,32 +237,7 @@ else:
                             st.session_state.cust_name = res.data[0]['name']
                             st.rerun()
                         else: new_customer_popup(clean_ph)
-                    else:
-                        st.error("Το τηλέφωνο πρέπει να έχει 10 ψηφία.")
+                    else: st.error("Το τηλέφωνο πρέπει να έχει 10 ψηφία.")
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
-                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
-                
-                # --- ΚΟΥΜΠΙ ΕΠΙΣΤΡΟΦΗΣ ---
-                ret_label = "🔙 ΑΚΥΡΩΣΗ ΕΠΙΣΤΡΟΦΗΣ" if st.session_state.return_mode else "🔄 ΕΠΙΣΤΡΟΦΗ"
-                if st.button(ret_label, use_container_width=True):
-                    st.session_state.return_mode = not st.session_state.return_mode
-                    st.rerun()
-                
-                if st.session_state.return_mode:
-                    st.warning("⚠️ ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ ΕΝΕΡΓΗ")
-
-                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
-                if bc and supabase:
-                    res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
-                    if res.data: 
-                        p = float(res.data[0]['price'])
-                        val = -p if st.session_state.return_mode else p
-                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': val})
-                        st.session_state.bc_key += 1; st.rerun()
-                    else: 
-                        st.error(f"Barcode {bc} όχι!")
-                        time.sleep(1); st.session_state.bc_key += 1; st.rerun()
-                
-                for idx, item in enumerate(st.session_state.cart):
-                    if st.button(f"❌ {item['name']} {item['price']}€",
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_
