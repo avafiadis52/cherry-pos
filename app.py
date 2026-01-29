@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.29) ---
-st.set_page_config(page_title="CHERRY v14.2.29", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.30) ---
+st.set_page_config(page_title="CHERRY v14.2.30", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -39,6 +39,9 @@ st.markdown("""
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
     
+    /* Style for the Return Toggle Button */
+    .return-active { background-color: #e74c3c !important; color: white !important; border: 2px solid #ffffff !important; }
+    
     div.stButton > button { 
         background-color: #d3d3d3 !important; 
         color: #000000 !important; 
@@ -47,16 +50,6 @@ st.markdown("""
         border: 1px solid #808080 !important;
     }
     
-    .data-row { 
-        font-family: 'Courier New', monospace;
-        background-color: #262626; 
-        padding: 12px; 
-        border-radius: 8px; 
-        margin-bottom: 5px; 
-        border-left: 5px solid #3498db;
-        display: block;
-        white-space: pre;
-    }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
@@ -81,19 +74,6 @@ def reset_app():
     st.session_state.return_mode = False
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
-
-def speak_text(text_to_say, play_beep=True):
-    beep_js = """
-    var context = new (window.AudioContext || window.webkitAudioContext)();
-    var osc = context.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, context.currentTime);
-    osc.connect(context.destination);
-    osc.start();
-    osc.stop(context.currentTime + 0.2);
-    """ if play_beep else ""
-    speech_js = f"var msg = new SpeechSynthesisUtterance('{text_to_say}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);" if text_to_say else ""
-    st.components.v1.html(f"<script>{beep_js}{speech_js}</script>", height=0)
 
 def finalize(disc_val, method):
     if not supabase: return
@@ -151,7 +131,7 @@ else:
             if text:
                 raw_query = text.lower().strip()
                 numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
-                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "έντεκα":11, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
+                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εξήντα":60, "εβδομήντα":70, "ογδόντα":80, "ενενήντα":90, "εκατό":100}
                 found_price = float(numbers[0]) if numbers else next((float(v) for k, v in num_map.items() if k in raw_query), None)
                 if found_price:
                     clean_name = raw_query
@@ -161,30 +141,19 @@ else:
                     st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
         st.divider()
-        
-        # Εδώ διορθώνεται η επιλογή του Sidebar
-        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"]
-        idx = 1 if st.session_state.return_mode else 0
-        view = st.radio("Μενού", menu_options, index=idx, key="main_menu")
-        
-        # Συγχρονισμός Mode
-        if view == "🔄 ΕΠΙΣΤΡΟΦΗ":
-            st.session_state.return_mode = True
-            current_screen = "🛒 ΤΑΜΕΙΟ"
-        else:
-            if view == "🛒 ΤΑΜΕΙΟ": st.session_state.return_mode = False
-            current_screen = view
-
+        current_screen = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"])
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
 
     if current_screen == "🛒 ΤΑΜΕΙΟ":
+        # ΤΟ ΚΟΥΜΠΙ ΠΟΥ ΕΝΑΛΛΑΣΣΕΙ ΤΟ MODE
+        btn_label = "🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΕΝΕΡΓΗ)" if st.session_state.return_mode else "🔄 ΕΝΕΡΓΟΠΟΙΗΣΗ ΕΠΙΣΤΡΟΦΗΣ"
+        if st.button(btn_label, use_container_width=True, type="primary" if st.session_state.return_mode else "secondary"):
+            st.session_state.return_mode = not st.session_state.return_mode
+            st.rerun()
+
         if st.session_state.return_mode:
-            # Κουμπί ακύρωσης που λειτουργεί άμεσα
-            if st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", use_container_width=True):
-                st.session_state.return_mode = False
-                st.rerun()
-            st.warning("⚠️ ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ: Οι τιμές θα είναι αρνητικές.")
+            st.error("⚠️ ΠΡΟΣΟΧΗ: ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ. Τα είδη που σκανάρετε θα έχουν αρνητική τιμή.")
         else:
             st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
             
@@ -197,8 +166,7 @@ else:
                     if len(clean_ph) == 10:
                         res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
                         if res.data:
-                            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
-                            st.rerun()
+                            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
                         else:
                             st.write(f"Το τηλέφωνο **{clean_ph}** δεν υπάρχει."); name = st.text_input("Όνομα Πελάτη")
                             if st.button("Καταχώρηση"):
