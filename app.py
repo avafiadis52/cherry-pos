@@ -63,6 +63,7 @@ st.markdown("""
         color: #000000 !important; 
         border-radius: 8px !important; 
         font-weight: bold !important; 
+        font-size: 14px !important;
         border: 1px solid #808080 !important;
     }
     
@@ -81,8 +82,6 @@ st.markdown("""
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
     .day-header { background-color: #34495e; color: #f1c40f; padding: 5px 10px; border-radius: 5px; margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-left: 5px solid #f1c40f; }
-    table { color: white !important; }
-    thead tr th { color: white !important; background-color: #333 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -257,8 +256,8 @@ else:
 
     if current_view == "🛒 ΤΑΜΕΙΟ":
         if st.session_state.return_mode:
-            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to_normal, use_container_width=True)
-            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
+            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ", on_click=switch_to_normal, use_container_width=True)
+            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ")
         else:
             st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
             
@@ -275,7 +274,7 @@ else:
                         else: new_customer_popup(clean_ph)
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
-                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                st.button(f"👤 {st.session_state.cust_name}", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
                 bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
                 if bc and supabase:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
@@ -292,4 +291,55 @@ else:
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
             total = sum(i['price'] for i in st.session_state.cart)
-            lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for
+            lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
+            st.markdown(f"<div class='cart-area'>{'Είδος':<20} | {'Τιμή':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+
+    elif current_view == "📊 MANAGER" and supabase:
+        st.title("📊 Αναφορές")
+        res_s = supabase.table("sales").select("*").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
+            today_date = get_athens_now().date()
+            tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
+            if not tdf.empty:
+                st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                st.dataframe(tdf[['s_date', 'item_name', 'final_item_price', 'method']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+    elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        c1,c2,c3,c4 = st.columns(4)
+        b, n = c1.text_input("BC"), c2.text_input("Όνομα")
+        p, s = c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=-999)
+        if st.button("Προσθήκη", use_container_width=True):
+            if b and n:
+                try:
+                    supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                    st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+                except Exception as e: st.error(f"Σφάλμα: {e}")
+        st.divider()
+        res = supabase.table("inventory").select("*").execute()
+        if res.data:
+            for _, r in pd.DataFrame(res.data).sort_values(by='name').iterrows():
+                col1, col2 = st.columns([5, 1])
+                with col1: st.markdown(f"<div class='data-row'>📦 {r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+                with col2:
+                    if st.button("❌", key=f"inv_{r['barcode']}", use_container_width=True):
+                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        st.title("👥 Διαχείριση Πελατών")
+        res_c = supabase.table("customers").select("*").execute()
+        if res_c.data:
+            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
+                col1, col2, col3, col4 = st.columns([4, 0.5, 0.5, 0.5])
+                with col1: st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']}</div>", unsafe_allow_html=True)
+                with col2:
+                    if st.button("📜", key=f"h_{r['id']}", use_container_width=True): customer_history_popup(r)
+                with col3:
+                    if st.button("📝", key=f"e_{r['id']}", use_container_width=True): edit_customer_popup(r)
+                with col4:
+                    if st.button("❌", key=f"d_{r['id']}", use_container_width=True):
+                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
