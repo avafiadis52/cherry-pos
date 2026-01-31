@@ -31,21 +31,30 @@ st.set_page_config(page_title="CHERRY v14.2.38", layout="wide", page_icon="🍒"
 
 st.markdown("""
     <style>
-    /* Εφαρμογή Πράσινου Πλαισίου σε όλη την οθόνη */
+    /* Γενικό Background */
     .stApp { 
         background-color: #1a1a1a; 
         color: white;
-        border: 8px solid #2ecc71 !important; 
-        box-shadow: inset 0 0 20px rgba(46, 204, 113, 0.5); 
-        margin: 0;
-        padding: 0;
     }
 
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     
-    .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
-    .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
+    /* ΤΟ ΠΡΑΣΙΝΟ ΠΛΑΙΣΙΟ ΣΤΗΝ ΕΣΩΤΕΡΙΚΗ ΟΘΟΝΗ ΠΡΟΪΟΝΤΩΝ */
+    .cart-area { 
+        font-family: 'Courier New', monospace; 
+        background-color: #000000; 
+        padding: 15px; 
+        border-radius: 10px; 
+        white-space: pre-wrap; 
+        border: 4px solid #2ecc71 !important; /* Το πράσινο πλαίσιο */
+        box-shadow: 0 0 15px rgba(46, 204, 113, 0.4); /* Λάμψη */
+        min-height: 300px; 
+        font-size: 16px;
+        color: #2ecc71; /* Πράσινα γράμματα τύπου Matrix */
+    }
+
+    .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; margin-top: 10px; text-shadow: 2px 2px 10px rgba(46, 204, 113, 0.5); }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
     
@@ -235,9 +244,6 @@ else:
                     price_to_add = -found_price if st.session_state.return_mode else found_price
                     st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
-                else:
-                    speak_text("Δεν κατάλαβα")
-                    st.warning("Σφάλμα: Δεν βρέθηκε το είδος")
 
         st.divider()
         menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"]
@@ -259,10 +265,4 @@ else:
         cl, cr = st.columns([1, 1.5])
         with cl:
             if st.session_state.selected_cust_id is None:
-                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key=f"ph_{st.session_state.ph_key}")
-                if ph:
-                    clean_ph = ''.join(filter(str.isdigit, ph))
-                    if len(clean_ph) == 10:
-                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
-                        if res.data:
-                            st
+                ph = st.text_input("Τηλέφωνο (10 ψη
