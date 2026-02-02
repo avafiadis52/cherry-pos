@@ -390,27 +390,33 @@ else:
 
     elif current_view == "⚙️ SYSTEM" and supabase:
         st.title("⚙️ Ρυθμίσεις Συστήματος")
-        st.warning("ΠΡΟΣΟΧΗ: Οι παρακάτω ενέργειες είναι μη αναστρέψιμες!")
         
-        target = st.selectbox("Επιλέξτε αρχείο για αρχικοποίηση", 
-                               ["--- Επιλέξτε ---", "Πωλήσεις & Ταμείο (Sales)", "Πελατολόγιο (Customers)", "Αποθήκη (Inventory)"])
+        # ΕΙΣΑΓΩΓΗ ΚΩΔΙΚΟΥ ΓΙΑ ΠΡΟΣΒΑΣΗ
+        sys_pass = st.text_input("Εισάγετε τον κωδικό πρόσβασης (SYSTEM)", type="password")
         
-        if target != "--- Επιλέξτε ---":
-            confirm_text = st.text_input(f"Για διαγραφή των {target}, γράψτε τη λέξη 'ΔΙΑΓΡΑΦΗ'")
-            if confirm_text == "ΔΙΑΓΡΑΦΗ":
-                if st.button(f"🚀 ΕΚΤΕΛΕΣΗ ΑΡΧΙΚΟΠΟΙΗΣΗΣ {target.upper()}", use_container_width=True):
-                    try:
-                        table_name = ""
-                        if "Sales" in target: table_name = "sales"
-                        elif "Customers" in target: table_name = "customers"
-                        elif "Inventory" in target: table_name = "inventory"
-                        
-                        if table_name:
-                            # Στη Supabase η διαγραφή όλων γίνεται συχνά με eq στο id (αν είναι > 0) ή φίλτρο που πιάνει τα πάντα
-                            # Εδώ χρησιμοποιούμε ένα φίλτρο που είναι πάντα αληθές για να αδειάσει ο πίνακας
-                            supabase.table(table_name).delete().neq("id", -1).execute()
-                            st.success(f"Το αρχείο {target} αρχικοποιήθηκε επιτυχώς!")
-                            time.sleep(2)
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Σφάλμα κατά την αρχικοποίηση: {e}")
+        if sys_pass == "999":
+            st.success("Πρόσβαση επετράπη.")
+            st.warning("ΠΡΟΣΟΧΗ: Οι παρακάτω ενέργειες είναι μη αναστρέψιμες!")
+            
+            target = st.selectbox("Επιλέξτε αρχείο για αρχικοποίηση", 
+                                   ["--- Επιλέξτε ---", "Πωλήσεις & Ταμείο (Sales)", "Πελατολόγιο (Customers)", "Αποθήκη (Inventory)"])
+            
+            if target != "--- Επιλέξτε ---":
+                confirm_text = st.text_input(f"Για διαγραφή των {target}, γράψτε τη λέξη 'ΔΙΑΓΡΑΦΗ'")
+                if confirm_text == "ΔΙΑΓΡΑΦΗ":
+                    if st.button(f"🚀 ΕΚΤΕΛΕΣΗ ΑΡΧΙΚΟΠΟΙΗΣΗΣ {target.upper()}", use_container_width=True):
+                        try:
+                            table_name = ""
+                            if "Sales" in target: table_name = "sales"
+                            elif "Customers" in target: table_name = "customers"
+                            elif "Inventory" in target: table_name = "inventory"
+                            
+                            if table_name:
+                                supabase.table(table_name).delete().neq("id", -1).execute()
+                                st.success(f"Το αρχείο {target} αρχικοποιήθηκε επιτυχώς!")
+                                time.sleep(2)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Σφάλμα κατά την αρχικοποίηση: {e}")
+        elif sys_pass != "":
+            st.error("Λανθασμένος κωδικός πρόσβασης!")
