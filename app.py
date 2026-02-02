@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.36) ---
-st.set_page_config(page_title="CHERRY v14.2.36", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.37) ---
+st.set_page_config(page_title="CHERRY v14.2.37", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -266,14 +266,4 @@ else:
                 if ph:
                     clean_ph = ''.join(filter(str.isdigit, ph))
                     if len(clean_ph) == 10:
-                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
-                        if res.data:
-                            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
-                        else: new_customer_popup(clean_ph)
-                    else:
-                        speak_text("Λάθος τηλέφωνο")
-                        st.error("Το τηλέφωνο πρέπει να έχει ακριβώς 10 ψηφία.")
-                        time.sleep(1); st.session_state.ph_key += 1; st.rerun()
-                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
-            else:
-                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_
+                        res = supabase.table("customers").select
