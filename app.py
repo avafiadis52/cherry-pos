@@ -31,10 +31,16 @@ st.set_page_config(page_title="CHERRY v14.2.35", layout="wide", page_icon="🍒"
 
 st.markdown("""
     <style>
-    .stApp { background-color: #1a1a1a; color: white; }
+    /* Γενικό Background */
+    .stApp { 
+        background-color: #1a1a1a; 
+        color: white;
+    }
+
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     
+    /* ΤΟ ΠΡΑΣΙΝΟ ΠΛΑΙΣΙΟ ΣΤΗΝ ΕΣΩΤΕΡΙΚΗ ΟΘΟΝΗ ΠΡΟΪΟΝΤΩΝ */
     .cart-area { 
         font-family: 'Courier New', monospace; 
         background-color: #000000; 
@@ -243,11 +249,11 @@ else:
                     st.warning("Σφάλμα: Δεν βρέθηκε το ποσό")
 
         st.divider()
-        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"]
+        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"]
         def_idx = 1 if st.session_state.return_mode else 0
         view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
-        current_view = view if view != "🔄 ΕΠΙΣΤΡΟΦΗ" else "🛒 ΤΑΜΕΙΟ"
+        current_view = "🛒 ΤΑΜΕΙΟ" if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"] else view
 
         if st.button("❌ Έξοδος", use_container_width=True):
             st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
@@ -387,36 +393,3 @@ else:
                 with col4:
                     if st.button("❌", key=f"d_{r['id']}", use_container_width=True):
                         supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-
-    elif current_view == "⚙️ SYSTEM" and supabase:
-        st.title("⚙️ Ρυθμίσεις Συστήματος")
-        
-        # ΕΙΣΑΓΩΓΗ ΚΩΔΙΚΟΥ ΓΙΑ ΠΡΟΣΒΑΣΗ
-        sys_pass = st.text_input("Εισάγετε τον κωδικό πρόσβασης (SYSTEM)", type="password")
-        
-        if sys_pass == "999":
-            st.success("Πρόσβαση επετράπη.")
-            st.warning("ΠΡΟΣΟΧΗ: Οι παρακάτω ενέργειες είναι μη αναστρέψιμες!")
-            
-            target = st.selectbox("Επιλέξτε αρχείο για αρχικοποίηση", 
-                                   ["--- Επιλέξτε ---", "Πωλήσεις & Ταμείο (Sales)", "Πελατολόγιο (Customers)", "Αποθήκη (Inventory)"])
-            
-            if target != "--- Επιλέξτε ---":
-                confirm_text = st.text_input(f"Για διαγραφή των {target}, γράψτε τη λέξη 'ΔΙΑΓΡΑΦΗ'")
-                if confirm_text == "ΔΙΑΓΡΑΦΗ":
-                    if st.button(f"🚀 ΕΚΤΕΛΕΣΗ ΑΡΧΙΚΟΠΟΙΗΣΗΣ {target.upper()}", use_container_width=True):
-                        try:
-                            table_name = ""
-                            if "Sales" in target: table_name = "sales"
-                            elif "Customers" in target: table_name = "customers"
-                            elif "Inventory" in target: table_name = "inventory"
-                            
-                            if table_name:
-                                supabase.table(table_name).delete().neq("id", -1).execute()
-                                st.success(f"Το αρχείο {target} αρχικοποιήθηκε επιτυχώς!")
-                                time.sleep(2)
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Σφάλμα κατά την αρχικοποίηση: {e}")
-        elif sys_pass != "":
-            st.error("Λανθασμένος κωδικός πρόσβασης!")
