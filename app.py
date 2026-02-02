@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.54) ---
-st.set_page_config(page_title="CHERRY v14.2.54", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.55) ---
+st.set_page_config(page_title="CHERRY v14.2.55", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -253,11 +253,8 @@ else:
             df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
             df['s_date_dt'] = pd.to_datetime(df['s_date'])
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
-            
-            # Υπολογισμός ΠΡΑΞΗΣ: Αυξουσα αρίθμηση ανά ημέρα
             df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
             df['ΠΡΑΞΗ'] = df.groupby('ΗΜΕΡΟΜΗΝΙΑ')['s_date'].transform(lambda x: pd.factorize(x)[0] + 1)
-            
             today_date = get_athens_now().date()
             
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
@@ -265,4 +262,6 @@ else:
                 tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
                 if not tdf.empty:
                     m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
-                    st.markdown("<div class='report-
+                    st.markdown("<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(tdf['final_item_price'].sum()), unsafe_allow_html=True)
+                    c1, c2, c3 = st.columns(3)
+                    c1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(m_t['final_item_price'].sum(), m_t['s
