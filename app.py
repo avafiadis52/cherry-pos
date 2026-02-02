@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.36) ---
-st.set_page_config(page_title="CHERRY v14.2.36", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.37) ---
+st.set_page_config(page_title="CHERRY v14.2.37", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -310,4 +310,13 @@ else:
             today_date = get_athens_now().date()
             
             csv_backup = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 BACKUP ALL SALES (CSV)", data=csv_backup, file_name=f"all_sales_{today_date}.csv", mime="text/csv", use_container_width
+            st.download_button("📥 BACKUP ALL SALES (CSV)", data=csv_backup, file_name=f"all_sales_{today_date}.csv", mime="text/csv", use_container_width=True)
+            st.divider()
+
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
+            
+            with t1:
+                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
+                if not tdf.empty:
+                    m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
+                    st.markdown(f"
