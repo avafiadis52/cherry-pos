@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.52) ---
-st.set_page_config(page_title="CHERRY v14.2.52", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.53) ---
+st.set_page_config(page_title="CHERRY v14.2.53", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -273,4 +273,63 @@ else:
                 sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
                 pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
                 if not pdf.empty:
-                    m_p, c_p = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method']
+                    m_p, c_p = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
+                    st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(pdf['final_item_price'].sum()), unsafe_allow_html=True)
+                    col1, col2, col3 = st.columns(3)
+                    col1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(m_p['final_item_price'].sum(), m_p['s_date'].nunique()), unsafe_allow_html=True)
+                    col2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(c_p['final_item_price'].sum(), c_p['s_date'].nunique()), unsafe_allow_html=True)
+                    col3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(pdf['discount'].sum()), unsafe_allow_html=True)
+                    for day in sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True):
+                        day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
+                        st.markdown("<div class='day-header'>📅 {} | Σύνολο: {:.2f}€</div>".format(day.strftime('%d/%m/%Y'), day_df['final_item_price'].sum()), unsafe_allow_html=True)
+                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+    elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        c1,c2,c3,c4 = st.columns(4)
+        b, n = c1.text_input("BC"), c2.text_input("Όνομα")
+        p, s = c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=-999)
+        if st.button("Προσθήκη", use_container_width=True):
+            if b and n:
+                try:
+                    supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                    st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+                except Exception as e: st.error("Σφάλμα: {}".format(e))
+        st.divider()
+        res = supabase.table("inventory").select("*").execute()
+        if res.data:
+            for _, r in pd.DataFrame(res.data).sort_values(by='name').iterrows():
+                col1, col2 = st.columns([5, 1])
+                stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
+                txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
+                with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
+                with col2:
+                    if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
+                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        st.title("👥 Διαχείριση Πελατών")
+        res_c = supabase.table("customers").select("*").execute()
+        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
+        if res_c.data:
+            sales_data = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
+            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
+                pts = int(sales_data[sales_data['cust_id'] == r['id']]['final_item_price'].sum() // 10)
+                col1, col2, col3 = st.columns([5, 1, 1])
+                with col1: st.markdown("<div class='data-row'>👤 {} | 📞 {} | ⭐ {} pts</div>".format(r['name'], r['phone'], pts), unsafe_allow_html=True)
+                with col2:
+                    if st.button("⭐", key="pts_{}".format(r['id']), use_container_width=True):
+                        show_customer_history(r['id'], r['name'])
+                with col3:
+                    if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
+                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+
+    elif current_view == "⚙️ SYSTEM" and supabase:
+        st.title("⚙️ Ρυθμίσεις Συστήματος")
+        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
+            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
+            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
+                if st.button("ΕΚΤΕΛΕΣΗ"):
+                    supabase.table(target.lower()).delete().neq("id", -1).execute()
+                    st.success("Έγινε!"); time.sleep(1); st.rerun()
+        else: st.error("🔒 Απαιτείται κωδικός.")
