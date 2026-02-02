@@ -31,30 +31,11 @@ st.set_page_config(page_title="CHERRY v14.2.35", layout="wide", page_icon="🍒"
 
 st.markdown("""
     <style>
-    /* Γενικό Background */
-    .stApp { 
-        background-color: #1a1a1a; 
-        color: white;
-    }
-
+    .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
-    
-    /* ΤΟ ΠΡΑΣΙΝΟ ΠΛΑΙΣΙΟ ΣΤΗΝ ΕΣΩΤΕΡΙΚΗ ΟΘΟΝΗ ΠΡΟΪΟΝΤΩΝ */
-    .cart-area { 
-        font-family: 'Courier New', monospace; 
-        background-color: #000000; 
-        padding: 15px; 
-        border-radius: 10px; 
-        white-space: pre-wrap; 
-        border: 4px solid #2ecc71 !important; 
-        box-shadow: 0 0 15px rgba(46, 204, 113, 0.4); 
-        min-height: 300px; 
-        font-size: 16px;
-        color: #2ecc71; 
-    }
-
-    .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; margin-top: 10px; text-shadow: 2px 2px 10px rgba(46, 204, 113, 0.5); }
+    .cart-area { font-family: 'Courier New', monospace; background-color: #2b2b2b; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #3b3b3b; min-height: 200px; font-size: 14px; }
+    .total-label { font-size: 60px; font-weight: bold; color: #2ecc71; text-align: center; }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
     .final-amount-popup { font-size: 40px; font-weight: bold; color: #e44d26; text-align: center; padding: 10px; border-radius: 10px; background-color: #fff3f0; border: 2px solid #e44d26; }
     
@@ -246,7 +227,7 @@ else:
                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
                 else:
                     speak_text("Δεν κατάλαβα")
-                    st.warning("Σφάλμα: Δεν βρέθηκε το ποσό")
+                    st.warning("Σφάλμα: Δεν βρέθηκε το είδος")
 
         st.divider()
         menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ"]
@@ -341,15 +322,22 @@ else:
                     st.markdown(f"<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                     pm_all, pc_all = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
                     col1, col2, col3 = st.columns(3)
-                    col1.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💵 Μετρητά<div class='stat-val'>{pm_all['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                    col2.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💳 Κάρτα<div class='stat-val'>{pc_all['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                    col3.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                    col1.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💵 Μετρητά<div class='stat-val'>{pm_all['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({pm_all['s_date'].nunique()} πράξεις)</div></div>", unsafe_allow_html=True)
+                    col2.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💳 Κάρτα<div class='stat-val'>{pc_all['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({pc_all['s_date'].nunique()} πράξεις)</div></div>", unsafe_allow_html=True)
+                    col3.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div><div class='stat-desc'>Σύνολο περιόδου</div></div>", unsafe_allow_html=True)
                     
                     all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
                     for day in all_days:
                         st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
                         day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
-                        st.dataframe(day_df[['s_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                        m_d, c_d = day_df[day_df['method'] == 'Μετρητά'], day_df[day_df['method'] == 'Κάρτα']
+                        st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:32px;'>{day_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                        cc1, cc2, cc3 = st.columns(3)
+                        cc1.markdown(f"<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{m_d['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                        cc2.markdown(f"<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{c_d['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                        cc3.markdown(f"<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{day_df['discount'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                        day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
+                        st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'discount', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
