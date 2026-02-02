@@ -335,15 +335,14 @@ else:
                     st.markdown(f"<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{pdf['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                     pm_all, pc_all = pdf[pdf['method'] == 'Μετρητά'], pdf[pdf['method'] == 'Κάρτα']
                     col1, col2, col3 = st.columns(3)
-                    col1.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💵 Μετρητά<div class='stat-val'>{pm_all['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                    col2.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💳 Κάρτα<div class='stat-val'>{pc_all['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                    col1.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💵 Μετρητά<div class='stat-val'>{pm_all['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({pm_all['s_date'].nunique()} πράξεις)</div></div>", unsafe_allow_html=True)
+                    col2.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>💳 Κάρτα<div class='stat-val'>{pc_all['final_item_price'].sum():.2f}€</div><div class='stat-desc'>({pc_all['s_date'].nunique()} πράξεις)</div></div>", unsafe_allow_html=True)
                     col3.markdown(f"<div class='report-stat' style='background-color:#1e1e1e;'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{pdf['discount'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                     
                     all_days = sorted(pdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True)
                     for day in all_days:
                         st.markdown(f"<div class='day-header'>📅 {day.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
                         day_df = pdf[pdf['ΗΜΕΡΟΜΗΝΙΑ'] == day].copy()
-                        # Επαναφορά στήλης ΠΡΑΞΗ και στην αναφορά περιόδου
                         day_df['ΠΡΑΞΗ'] = day_df.groupby('s_date').ngroup() + 1
                         st.dataframe(day_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
