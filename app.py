@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.37) ---
-st.set_page_config(page_title="CHERRY v14.2.37", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.38) ---
+st.set_page_config(page_title="CHERRY v14.2.38", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -319,4 +319,4 @@ else:
                 tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
                 if not tdf.empty:
                     m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
-                    st.markdown(f"
+                    st.markdown(f"""<div class='report-stat' style='border: 2px solid #2ecc71
