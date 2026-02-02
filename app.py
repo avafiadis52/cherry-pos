@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.46) ---
-st.set_page_config(page_title="CHERRY v14.2.46", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.47) ---
+st.set_page_config(page_title="CHERRY v14.2.47", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -94,7 +94,7 @@ def speak_text(text_to_say, play_beep=True):
     osc.start();
     osc.stop(context.currentTime + 0.2);
     """ if play_beep else ""
-    speech_js = "var msg = new SpeechSynthesisUtterance('{}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);".format(text_to_say) if text_to_say else ""
+    speech_js = f"var msg = new SpeechSynthesisUtterance('{text_to_say}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);" if text_to_say else ""
     st.components.v1.html(f"<script>{beep_js}{speech_js}</script>", height=0)
 
 def play_sound(url):
@@ -207,4 +207,72 @@ else:
     # --- VIEW ROUTING ---
     if current_view == "🛒 ΤΑΜΕΙΟ":
         if st.session_state.return_mode:
-            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to
+            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to_normal, use_container_width=True)
+            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
+        else:
+            st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+        
+        cl, cr = st.columns([1, 1.5])
+        with cl:
+            if st.session_state.selected_cust_id is None:
+                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key=f"ph_{st.session_state.ph_key}")
+                if ph:
+                    clean_ph = ''.join(filter(str.isdigit, ph))
+                    if len(clean_ph) == 10:
+                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
+                        if res.data:
+                            st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']
+                            st.rerun()
+                        else: new_customer_popup(clean_ph)
+                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True):
+                    st.session_state.selected_cust_id = 0
+                    st.rerun()
+            else:
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+                if bc and supabase:
+                    res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
+                    if res.data: 
+                        val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
+                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': val})
+                        st.session_state.bc_key += 1
+                        st.rerun()
+                for idx, item in enumerate(st.session_state.cart):
+                    if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True):
+                        st.session_state.cart.pop(idx)
+                        st.rerun()
+                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True):
+                    payment_popup()
+            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+        with cr:
+            total = sum(i['price'] for i in st.session_state.cart)
+            lines = [f"{i['name'][:20]:20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
+            st.markdown(f"<div class='cart-area'>{'Είδος':20} | {'Τιμή':>6}\n{'-'*30}\n{'\n'.join(lines)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+
+    elif current_view == "📊 MANAGER" and supabase:
+        st.title("📊 Αναφορές")
+        res_s = supabase.table("sales").select("*").execute()
+        res_c = supabase.table("customers").select("id, name").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
+            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
+            df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
+            df['ΠΡΑΞΗ'] = df.groupby('ΗΜΕΡΟΜΗΝΙΑ')['s_date'].transform(lambda x: pd.factorize(x)[0] + 1)
+            today_date = get_athens_now().date()
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
+            with t1:
+                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
+                if not tdf.empty:
+                    st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
+                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                else: st.info("Δεν υπάρχουν πωλήσεις σήμερα.")
+            with t2:
+                cs, ce = st.columns(2)
+                sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
+                pdf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
+                if not pdf.empty:
+                    for day in sorted(pdf['ΗΜΕΡΟΜ
