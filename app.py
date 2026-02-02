@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.35) ---
-st.set_page_config(page_title="CHERRY v14.2.35", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.36) ---
+st.set_page_config(page_title="CHERRY v14.2.36", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -276,49 +276,4 @@ else:
                         time.sleep(1); st.session_state.ph_key += 1; st.rerun()
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
-                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
-                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
-                if bc and supabase:
-                    res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
-                    if res.data: 
-                        val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
-                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': val})
-                        st.session_state.bc_key += 1; st.rerun()
-                    else:
-                        speak_text(f"Barcode {bc} όχι")
-                        st.error(f"Barcode {bc} όχι!"); time.sleep(1); st.session_state.bc_key += 1; st.rerun()
-                for idx, item in enumerate(st.session_state.cart):
-                    if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
-                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
-            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
-        with cr:
-            total = sum(i['price'] for i in st.session_state.cart)
-            lines = [f"{i['name'][:20]:<20} | {i['price']:>6.2f}€" for i in st.session_state.cart]
-            st.markdown(f"<div class='cart-area'>{'Είδος':<20} | {'Τιμή':>6}\n{'-'*30}\n{chr(10).join(lines)}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
-
-    elif current_view == "📊 MANAGER" and supabase:
-        st.title("📊 Αναφορές")
-        res_s = supabase.table("sales").select("*").execute()
-        res_c = supabase.table("customers").select("id, name").execute()
-        if res_s.data:
-            df = pd.DataFrame(res_s.data)
-            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
-            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
-            df['s_date_dt'] = pd.to_datetime(df['s_date'])
-            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
-            today_date = get_athens_now().date()
-            
-            csv_backup = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 BACKUP ALL SALES (CSV)", data=csv_backup, file_name=f"all_sales_{today_date}.csv", mime="text/csv", use_container_width=True)
-            st.divider()
-
-            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
-            
-            with t1:
-                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
-                if not tdf.empty:
-                    m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
-                    st.markdown(f"<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{tdf['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"<div class='report-stat
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_
