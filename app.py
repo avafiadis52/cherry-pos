@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.63) ---
-st.set_page_config(page_title="CHERRY v14.2.63", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.64) ---
+st.set_page_config(page_title="CHERRY v14.2.64", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -102,8 +102,11 @@ def new_customer_popup(phone):
                     st.session_state.cust_name = res.data[0]['name']
                     st.success("Ο πελάτης καταχωρήθηκε!")
                     time.sleep(1); st.rerun()
-            except Exception as e: st.error(f"Σφάλμα: {e}")
-        else: st.warning("Παρακαλώ δώστε όνομα.")
+            except Exception as e:
+                st.error(f"Σφάλμα καταχώρησης: {e}")
+                speak_text("Παρουσιάστηκε σφάλμα στην καταχώρηση")
+        else:
+            st.warning("Παρακαλώ δώστε όνομα.")
 
 def finalize(disc_val, method):
     if not supabase: return
@@ -127,7 +130,9 @@ def finalize(disc_val, method):
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         time.sleep(1.5); reset_app()
-    except Exception as e: st.error(f"Σφάλμα κατά την πληρωμή: {e}")
+    except Exception as e:
+        st.error(f"Σφάλμα κατά την πληρωμή: {e}")
+        speak_text("Αποτυχία πληρωμής")
 
 @st.dialog("💰 Πληρωμή")
 def payment_popup():
@@ -142,7 +147,9 @@ def payment_popup():
             try:
                 if "%" in inp: disc = round((float(inp.replace("%",""))/100 * total), 2)
                 else: disc = round(float(inp), 2)
-            except: st.error("Λάθος μορφή έκπτωσης.")
+            except:
+                st.error("Λάθος μορφή έκπτωσης.")
+                speak_text("Λάθος μορφή έκπτωσης")
     final_p = round(total - disc, 2)
     st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
     st.divider()
@@ -160,7 +167,8 @@ def show_customer_history(c_id, c_name):
             st.metric("Συνολικές Αγορές", f"{pdf['final_item_price'].sum():.2f}€")
             st.dataframe(pdf[['s_date', 'item_name', 'final_item_price', 'method']], use_container_width=True, hide_index=True)
         else: st.info("Δεν βρέθηκαν πωλήσεις.")
-    except Exception as e: st.error(f"Σφάλμα ιστορικού: {e}")
+    except Exception as e:
+        st.error(f"Σφάλμα ιστορικού: {e}")
 
 # --- 5. MAIN UI ---
 if st.session_state.is_logged_out:
@@ -191,12 +199,17 @@ else:
                         res = supabase.table("customers").select("*").eq("phone", ph).execute()
                         if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
                         else: new_customer_popup(ph)
-                    except Exception as e: st.error(f"Σφάλμα αναζήτησης: {e}")
+                    except Exception as e:
+                        st.error(f"Σφάλμα αναζήτησης: {e}")
+                        speak_text("Σφάλμα σύνδεσης")
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
                 st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                
+                # --- VOICE INTEGRATED IN MAIN SCREEN ---
                 v_col1, v_col2 = st.columns([1, 1])
-                with v_col1: bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+                with v_col1:
+                    bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
                 with v_col2:
                     st.write("Ή 🎙️ Φωνητική Εντολή")
                     if HAS_MIC:
@@ -213,8 +226,12 @@ else:
                                     p_add = -f_price if st.session_state.return_mode else f_price
                                     st.session_state.cart.append({'bc': 'VOICE', 'name': c_name.strip().upper() or "ΦΩΝΗΤΙΚΗ", 'price': p_add})
                                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
-                                else: st.warning("Δεν βρέθηκε τιμή.")
-                            except Exception as e: st.error(f"Σφάλμα φωνής: {e}")
+                                else:
+                                    st.warning("Δεν βρέθηκε τιμή.")
+                                    speak_text("Δεν κατάλαβα την τιμή")
+                            except Exception as e:
+                                st.error(f"Σφάλμα φωνής: {e}")
+                
                 if bc:
                     try:
                         res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
@@ -222,8 +239,12 @@ else:
                             v = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
                             st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': v})
                             st.session_state.bc_key += 1; st.rerun()
-                        else: st.error("Το Barcode δεν βρέθηκε!")
-                    except Exception as e: st.error(f"Σφάλμα βάσης: {e}")
+                        else:
+                            st.error("Το Barcode δεν βρέθηκε!")
+                            speak_text("Το barcode δεν βρέθηκε")
+                    except Exception as e:
+                        st.error(f"Σφάλμα βάσης: {e}")
+                
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
                 if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
@@ -261,7 +282,8 @@ else:
                         st.markdown(f"<div class='report-stat' style='border:2px solid #3498db;'><div class='stat-val'>{p_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                         st.dataframe(p_df[['s_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']], use_container_width=True, hide_index=True)
             else: st.info("Δεν υπάρχουν δεδομένα.")
-        except Exception as e: st.error(f"Σφάλμα αναφορών: {e}")
+        except Exception as e:
+            st.error(f"Σφάλμα αναφορών: {e}")
 
     elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Αποθήκη")
@@ -274,6 +296,7 @@ else:
                     supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
                     st.success("Έγινε!"); time.sleep(0.5); st.rerun()
                 except Exception as e: st.error(f"Σφάλμα: {e}")
+            else: st.warning("Συμπληρώστε BC και Όνομα.")
         st.divider()
         try:
             res = supabase.table("inventory").select("*").execute()
@@ -283,7 +306,9 @@ else:
                     with col1: st.markdown(f"<div class='data-row'>📦 {r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
                     with col2:
                         if st.button("❌", key=f"inv_{r['barcode']}", use_container_width=True):
-                            supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+                            try:
+                                supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+                            except Exception as e: st.error(f"Σφάλμα διαγραφής: {e}")
         except Exception as e: st.error(f"Σφάλμα φόρτωσης: {e}")
 
     elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
@@ -298,7 +323,9 @@ else:
                         if st.button("⭐", key=f"pts_{r['id']}", use_container_width=True): show_customer_history(r['id'], r['name'])
                     with col3:
                         if st.button("❌", key=f"d_{r['id']}", use_container_width=True):
-                            supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+                            try:
+                                supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+                            except Exception as e: st.error(f"Σφάλμα διαγραφής: {e}")
         except Exception as e: st.error(f"Σφάλμα πελατών: {e}")
 
     elif current_view == "⚙️ SYSTEM" and supabase:
