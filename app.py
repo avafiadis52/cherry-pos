@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.67) ---
-st.set_page_config(page_title="CHERRY v14.2.67", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.68) ---
+st.set_page_config(page_title="CHERRY v14.2.68", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -280,4 +280,18 @@ else:
                     c1, c2, c3 = st.columns(3)
                     c1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(m_t['final_item_price'].sum(), m_t['s_date'].nunique()), unsafe_allow_html=True)
                     c2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(c_t['final_item_price'].sum(), c_t['s_date'].nunique()), unsafe_allow_html=True)
-                    c3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(tdf['discount'].sum()), unsafe_allow_
+                    c3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(tdf['discount'].sum()), unsafe_allow_html=True)
+                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                else: st.info("Δεν υπάρχουν πωλήσεις σήμερα.")
+
+            with t2:
+                cs, ce = st.columns(2)
+                sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
+                p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
+                if not p_df.empty:
+                    st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
+                    p_mt, p_ct = p_df[p_df['method'] == 'Μετρητά'], p_df[p_df['method'] == 'Κάρτα']
+                    pc1, pc2, pc3 = st.columns(3)
+                    pc1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(p_mt['final_item_price'].sum(), p_mt['s_date'].nunique()), unsafe_allow_html=True)
+                    pc2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(p_ct['final_item_price'].sum(), p_ct['s_date'].nunique()), unsafe_allow_html=True)
+                    pc3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color
