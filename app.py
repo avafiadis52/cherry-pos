@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.60) ---
-st.set_page_config(page_title="CHERRY v14.2.60", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.61) ---
+st.set_page_config(page_title="CHERRY v14.2.61", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -170,7 +170,7 @@ def show_customer_history(c_id, c_name):
     if res.data:
         pdf = pd.DataFrame(res.data)
         st.metric("Συνολικές Αγορές", f"{pdf['final_item_price'].sum():.2f}€")
-        st.dataframe(pdf[['s_date', 'item_name', 'final_item_price', 'method']], use_container_width=True, hide_index=True)
+        st.dataframe(pdf[['s_date', 'item_name', 'unit_price', 'final_item_price', 'method']], use_container_width=True, hide_index=True)
     else:
         st.info("Δεν βρέθηκαν πωλήσεις για αυτόν τον πελάτη.")
 
@@ -276,7 +276,7 @@ else:
                     c1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(m_t['final_item_price'].sum(), m_t['s_date'].nunique()), unsafe_allow_html=True)
                     c2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(c_t['final_item_price'].sum(), c_t['s_date'].nunique()), unsafe_allow_html=True)
                     c3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(tdf['discount'].sum()), unsafe_allow_html=True)
-                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
                 else: st.info("Δεν υπάρχουν πωλήσεις σήμερα.")
 
             with t2:
@@ -299,7 +299,7 @@ else:
                         sc1.markdown("<div class='report-stat' style='padding:10px;'>💵 Μετρητά<div class='stat-val' style='font-size:18px;'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(dm_t['final_item_price'].sum(), dm_t['s_date'].nunique()), unsafe_allow_html=True)
                         sc2.markdown("<div class='report-stat' style='padding:10px;'>💳 Κάρτα<div class='stat-val' style='font-size:18px;'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(dc_t['final_item_price'].sum(), dc_t['s_date'].nunique()), unsafe_allow_html=True)
                         sc3.markdown("<div class='report-stat' style='padding:10px;'>📉 Εκπτώσεις<div class='stat-val' style='font-size:18px; color:#e74c3c;'>{:.2f}€</div></div>".format(d_df['discount'].sum()), unsafe_allow_html=True)
-                        st.dataframe(d_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                        st.dataframe(d_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
 
     elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
