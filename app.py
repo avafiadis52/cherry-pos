@@ -4,7 +4,7 @@ import time
 import streamlit as st
 from supabase import create_client, Client
 import re
-import plotly.express as px  # Νέα προσθήκη για τα γραφήματα
+import plotly.express as px
 
 # --- 1. VOICE COMPONENT SETUP ---
 HAS_MIC = False
@@ -206,4 +206,61 @@ else:
                     if numbers: clean_name = clean_name.replace(numbers[0], "")
                     for w in ["ευρώ", "ευρω", "τιμή", "τιμη"] + list(num_map.keys()): clean_name = clean_name.replace(w, "")
                     price_to_add = -found_price if st.session_state.return_mode else found_price
-                    st.session_state.cart.append({'bc': 'VOICE', 'name':
+                    st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
+                    st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
+                else:
+                    st.error("⚠️ Η τιμή δεν αναγνωρίστηκε")
+                    speak_text("Η τιμή δεν αναγνωρίστηκε")
+
+        st.divider()
+        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"]
+        def_idx = 1 if st.session_state.return_mode else 0
+        view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
+        st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
+        current_view = view if view != "🔄 ΕΠΙΣΤΡΟΦΗ" else "🛒 ΤΑΜΕΙΟ"
+        
+        if st.button("❌ Έξοδος / Κλείδωμα", use_container_width=True): 
+            st.session_state.logged_in = False
+            st.session_state.cart = []
+            st.rerun()
+
+    # --- VIEW ROUTING ---
+    if current_view == "🛒 ΤΑΜΕΙΟ":
+        if st.session_state.return_mode:
+            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to_normal, use_container_width=True)
+            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
+        else:
+            st.markdown("<div class='status-header'>Πελάτης: {}</div>".format(st.session_state.cust_name), unsafe_allow_html=True)
+            
+        cl, cr = st.columns([1, 1.5])
+        with cl:
+            if st.session_state.selected_cust_id is None:
+                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key="ph_{}".format(st.session_state.ph_key))
+                if ph:
+                    clean_ph = ''.join(filter(str.isdigit, ph))
+                    if len(clean_ph) == 10:
+                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
+                        if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
+                        else: new_customer_popup(clean_ph)
+                    else:
+                        st.error("⚠️ Το τηλέφωνο πρέπει να έχει 10 ψηφία")
+                        speak_text("Λάθος τηλέφωνο")
+                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
+            else:
+                st.button("👤 {} (Αλλαγή)".format(st.session_state.cust_name), on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                bc = st.text_input("Barcode", key="bc_{}".format(st.session_state.bc_key))
+                if bc and supabase:
+                    res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
+                    if res.data: 
+                        val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
+                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': val})
+                        st.session_state.bc_key += 1; st.rerun()
+                    else:
+                        st.error("⚠️ Το Barcode δεν υπάρχει στην αποθήκη")
+                        speak_text("Το Barcode δεν υπάρχει")
+                for idx, item in enumerate(st.session_state.cart):
+                    if st.button("❌ {} {}€".format(item['name'], item['price']), key="del_{}".format(idx), use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
+                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
+            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+        with cr:
+            total = sum(i
