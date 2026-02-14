@@ -26,8 +26,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.61) ---
-st.set_page_config(page_title="CHERRY v14.2.61", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.62) ---
+st.set_page_config(page_title="CHERRY v14.2.62", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -61,12 +61,12 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Session States
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
 if 'cust_name' not in st.session_state: st.session_state.cust_name = "Λιανική Πώληση"
 if 'bc_key' not in st.session_state: st.session_state.bc_key = 0
 if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
-if 'is_logged_out' not in st.session_state: st.session_state.is_logged_out = False
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
@@ -174,11 +174,22 @@ def show_customer_history(c_id, c_name):
     else:
         st.info("Δεν βρέθηκαν πωλήσεις για αυτόν τον πελάτη.")
 
-# --- 5. MAIN UI ---
-if st.session_state.is_logged_out:
-    st.markdown("<h1 style='text-align:center;color:#e74c3c;'>Αποσυνδεθήκατε</h1>", unsafe_allow_html=True)
-    if st.button("Επανασύνδεση"): st.session_state.is_logged_out = False; st.rerun()
+# --- 5. LOGIN LOGIC ---
+if not st.session_state.logged_in:
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c2:
+        st.markdown("<h1 style='text-align:center;'>🔒 CHERRY LOGIN</h1>", unsafe_allow_html=True)
+        pwd = st.text_input("Εισάγετε τον κωδικό πρόσβασης", type="password")
+        if st.button("Είσοδος", use_container_width=True):
+            if pwd == "CHERRY123":
+                st.session_state.logged_in = True
+                st.success("Επιτυχής σύνδεση!")
+                time.sleep(0.5); st.rerun()
+            else:
+                st.error("❌ Λάθος κωδικός")
+                speak_text("Λάθος κωδικός")
 else:
+    # --- 6. MAIN UI (Only if logged in) ---
     with st.sidebar:
         st.markdown("<div class='sidebar-date'>{}</div>".format(get_athens_now().strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
         st.subheader("🎙️ Φωνητική Εντολή")
@@ -206,7 +217,11 @@ else:
         view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
         current_view = view if view != "🔄 ΕΠΙΣΤΡΟΦΗ" else "🛒 ΤΑΜΕΙΟ"
-        if st.button("❌ Έξοδος", use_container_width=True): st.session_state.cart = []; st.session_state.is_logged_out = True; st.rerun()
+        
+        if st.button("❌ Έξοδος / Κλείδωμα", use_container_width=True): 
+            st.session_state.logged_in = False
+            st.session_state.cart = []
+            st.rerun()
 
     # --- VIEW ROUTING ---
     if current_view == "🛒 ΤΑΜΕΙΟ":
