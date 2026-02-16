@@ -5,3 +5,4 @@ pandas
 streamlit
 supabase
 streamlit-mic-recorder
+plotly
