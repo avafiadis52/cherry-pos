@@ -283,29 +283,3 @@ else:
             t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
             with t1:
                 tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
-                if not tdf.empty:
-                    m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
-                    st.markdown("<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(tdf['final_item_price'].sum()), unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div></div>".format(m_t['final_item_price'].sum()), unsafe_allow_html=True)
-                    c2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div></div>".format(c_t['final_item_price'].sum()), unsafe_allow_html=True)
-                    c3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(tdf['discount'].sum()), unsafe_allow_html=True)
-                    st.dataframe(tdf[['s_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
-                else: st.info("Δεν υπάρχουν πωλήσεις σήμερα.")
-
-            with t2:
-                cs, ce = st.columns(2)
-                sd, ed = cs.date_input("Από", today_date-timedelta(days=7)), ce.date_input("Έως", today_date)
-                p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
-                if not p_df.empty:
-                    st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
-                    st.dataframe(p_df[['s_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']], use_container_width=True, hide_index=True)
-
-    elif current_view == "📈 INSIGHTS" and supabase:
-        st.title("📈 Στατιστική Ανάλυση (Insights)")
-        res_s = supabase.table("sales").select("*").execute()
-        if res_s.data:
-            df = pd.DataFrame(res_s.data)
-            df['s_date_dt'] = pd.to_datetime(df['s_date'])
-            
-            st.subheader("📊 Ανάλυση Π
