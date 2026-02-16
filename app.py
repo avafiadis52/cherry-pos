@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.63) ---
-st.set_page_config(page_title="CHERRY v14.2.63", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.62) ---
+st.set_page_config(page_title="CHERRY v14.2.62", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -36,14 +36,6 @@ st.markdown("""
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     
-    /* ΑΛΛΑΓΗ: Έντονο χρώμα στις τιμές των metrics (Τζίρος, Μέση Πώληση, Πράξεις) */
-    [data-testid="stMetricValue"] {
-        color: #00ff00 !important;
-        font-weight: 900 !important;
-        font-size: 2.2rem !important;
-        text-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
-    }
-
     .cart-area { 
         font-family: 'Courier New', monospace; 
         background-color: #000000; padding: 15px; border-radius: 10px; 
@@ -66,6 +58,13 @@ st.markdown("""
     .day-header { background-color: #34495e; color: #f1c40f; padding: 10px; border-radius: 5px; margin-top: 25px; margin-bottom: 10px; font-weight: bold; border-left: 8px solid #f1c40f; }
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
+
+    /* ΑΛΛΑΓΗ: Έντονο χρώμα για τις τιμές των metrics (Συν. Τζίρος, Μέση Πώληση, Πλήθος Πράξεων) */
+    [data-testid="stMetricValue"] {
+        color: #2ecc71 !important;
+        font-weight: 900 !important;
+        font-size: 2rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -186,3 +185,105 @@ def show_customer_history(c_id, c_name):
 # --- 5. LOGIN LOGIC ---
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1, 1, 1])
+    with c2:
+        st.markdown("<h1 style='text-align:center;'>🔒 CHERRY LOGIN</h1>", unsafe_allow_html=True)
+        pwd = st.text_input("Εισάγετε τον κωδικό πρόσβασης", type="password")
+        if st.button("Είσοδος", use_container_width=True):
+            if pwd == "CHERRY123":
+                st.session_state.logged_in = True
+                st.success("Επιτυχής σύνδεση!")
+                time.sleep(0.5); st.rerun()
+            else:
+                st.error("❌ Λάθος κωδικός")
+                speak_text("Λάθος κωδικός")
+else:
+    # --- 6. MAIN UI ---
+    with st.sidebar:
+        st.markdown("<div class='sidebar-date'>{}</div>".format(get_athens_now().strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
+        st.subheader("🎙️ Φωνητική Εντολή")
+        if HAS_MIC:
+            text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", just_once=True, key="voice_{}".format(st.session_state.mic_key))
+            if text:
+                raw_query = text.lower().strip()
+                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
+                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εκατό":100}
+                found_price = float(numbers[0]) if numbers else next((float(v) for k, v in num_map.items() if k in raw_query), None)
+                if found_price:
+                    clean_name = raw_query
+                    if numbers: clean_name = clean_name.replace(numbers[0], "")
+                    for w in ["ευρώ", "ευρω", "τιμή", "τιμη"] + list(num_map.keys()): clean_name = clean_name.replace(w, "")
+                    price_to_add = -found_price if st.session_state.return_mode else found_price
+                    st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
+                    st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
+                else:
+                    st.error("⚠️ Η τιμή δεν αναγνωρίστηκε")
+                    speak_text("Η τιμή δεν αναγνωρίστηκε")
+
+        st.divider()
+        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"]
+        def_idx = 1 if st.session_state.return_mode else 0
+        view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
+        st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
+        current_view = view if view != "🔄 ΕΠΙΣΤΡΟΦΗ" else "🛒 ΤΑΜΕΙΟ"
+        
+        if st.button("❌ Έξοδος / Κλείδωμα", use_container_width=True): 
+            st.session_state.logged_in = False
+            st.session_state.cart = []
+            st.rerun()
+
+    # --- VIEW ROUTING ---
+    if current_view == "🛒 ΤΑΜΕΙΟ":
+        if st.session_state.return_mode:
+            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to_normal, use_container_width=True)
+            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
+        else:
+            st.markdown("<div class='status-header'>Πελάτης: {}</div>".format(st.session_state.cust_name), unsafe_allow_html=True)
+            
+        cl, cr = st.columns([1, 1.5])
+        with cl:
+            if st.session_state.selected_cust_id is None:
+                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key="ph_{}".format(st.session_state.ph_key))
+                if ph:
+                    clean_ph = ''.join(filter(str.isdigit, ph))
+                    if len(clean_ph) == 10:
+                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
+                        if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
+                        else: new_customer_popup(clean_ph)
+                    else:
+                        st.error("⚠️ Το τηλέφωνο πρέπει να έχει 10 ψηφία")
+                        speak_text("Λάθος τηλέφωνο")
+                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
+            else:
+                st.button("👤 {} (Αλλαγή)".format(st.session_state.cust_name), on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                bc = st.text_input("Barcode", key="bc_{}".format(st.session_state.bc_key))
+                if bc and supabase:
+                    res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
+                    if res.data: 
+                        val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
+                        st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': val})
+                        st.session_state.bc_key += 1; st.rerun()
+                    else:
+                        st.error("⚠️ Το Barcode δεν υπάρχει στην αποθήκη")
+                        speak_text("Το Barcode δεν υπάρχει")
+                for idx, item in enumerate(st.session_state.cart):
+                    if st.button("❌ {} {}€".format(item['name'], item['price']), key="del_{}".format(idx), use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
+                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
+            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+        with cr:
+            total = sum(i['price'] for i in st.session_state.cart)
+            lines = ["{:20} | {:>6.2f}€".format(i['name'][:20], i['price']) for i in st.session_state.cart]
+            st.markdown("<div class='cart-area'>{:20} | {:>6}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*30, '\n'.join(lines)), unsafe_allow_html=True)
+            st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
+
+    elif current_view == "📊 MANAGER" and supabase:
+        st.title("📊 Αναφορές")
+        res_s = supabase.table("sales").select("*").execute()
+        res_c = supabase.table("customers").select("id, name").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
+            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
+            df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
+            df['ΠΡΑΞΗ'] = df.groupby
