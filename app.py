@@ -295,4 +295,13 @@ else:
 
             with t2:
                 cs, ce = st.columns(2)
-                sd, ed = cs.
+                sd = cs.date_input("Από", today_date-timedelta(days=7))
+                ed = ce.date_input("Έως", today_date)
+                p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
+                if not p_df.empty:
+                    st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
+                    st.dataframe(p_df[['s_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']], use_container_width=True, hide_index=True)
+
+            with t3:
+                st.subheader("📊 Ανάλυση Πωλήσεων")
+                col_
