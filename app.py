@@ -56,13 +56,8 @@ st.markdown("""
     .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     .stat-desc { font-size: 13px; color: #888; }
     .day-header { background-color: #34495e; color: #f1c40f; padding: 10px; border-radius: 5px; margin-top: 25px; margin-bottom: 10px; font-weight: bold; border-left: 8px solid #f1c40f; }
-    
-    /* ENHANCED METRICS FOR INSIGHTS */
-    [data-testid="stMetricValue"] {
-        color: #00ff00 !important; 
-        font-weight: 800 !important;
-        text-shadow: 0px 0px 10px rgba(0, 255, 0, 0.2);
-    }
+    table { color: white !important; }
+    thead tr th { color: white !important; background-color: #333 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -102,15 +97,15 @@ def speak_text(text_to_say, play_beep=True):
     osc.start();
     osc.stop(context.currentTime + 0.2);
     """ if play_beep else ""
-    speech_js = f"var msg = new SpeechSynthesisUtterance('{text_to_say}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);" if text_to_say else ""
-    st.components.v1.html(f"<script>{beep_js}{speech_js}</script>", height=0)
+    speech_js = "var msg = new SpeechSynthesisUtterance('{}'); msg.lang = 'el-GR'; window.speechSynthesis.speak(msg);".format(text_to_say) if text_to_say else ""
+    st.components.v1.html("<script>{}{}</script>".format(beep_js, speech_js), height=0)
 
 def play_sound(url):
-    st.components.v1.html(f'<audio autoplay style="display:none"><source src="{url}" type="audio/mpeg"></audio>', height=0)
+    st.components.v1.html('<audio autoplay style="display:none"><source src="{}" type="audio/mpeg"></audio>'.format(url), height=0)
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
-    st.write(f"Το τηλέφωνο **{phone}** δεν υπάρχει στη βάση.")
+    st.write("Το τηλέφωνο **{}** δεν υπάρχει στη βάση.".format(phone))
     name = st.text_input("Ονοματεπώνυμο Πελάτη")
     if st.button("Καταχώρηση & Συνέχεια", use_container_width=True):
         if name:
@@ -121,7 +116,7 @@ def new_customer_popup(phone):
                     st.session_state.cust_name = res.data[0]['name']
                     st.success("Ο πελάτης καταχωρήθηκε!")
                     time.sleep(1); st.rerun()
-            except Exception as e: st.error(f"Σφάλμα: {e}")
+            except Exception as e: st.error("Σφάλμα: {}".format(e))
         else: st.warning("Παρακαλώ δώστε όνομα.")
 
 def finalize(disc_val, method):
@@ -146,12 +141,12 @@ def finalize(disc_val, method):
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         time.sleep(1.5); reset_app()
-    except Exception as e: st.error(f"Σφάλμα: {e}")
+    except Exception as e: st.error("Σφάλμα: {}".format(e))
 
 @st.dialog("💰 Πληρωμή")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f"<h3 style='text-align:center;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center;'>Σύνολο: {:.2f}€</h3>".format(total), unsafe_allow_html=True)
     st.write("Θέλετε έκπτωση;")
     opt = st.radio("Επιλογή", ["ΟΧΙ", "ΝΑΙ"], horizontal=True, label_visibility="collapsed")
     disc = 0.0
@@ -163,7 +158,7 @@ def payment_popup():
                 else: disc = round(float(inp), 2)
             except: st.error("Λάθος μορφή")
     final_p = round(total - disc, 2)
-    st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
+    st.markdown("<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {:.2f}€</div>".format(final_p), unsafe_allow_html=True)
     st.divider()
     c1, c2 = st.columns(2)
     if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
@@ -197,10 +192,10 @@ if not st.session_state.logged_in:
 else:
     # --- 6. MAIN UI ---
     with st.sidebar:
-        st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-date'>{}</div>".format(get_athens_now().strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
-            text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", just_once=True, key=f"voice_{st.session_state.mic_key}")
+            text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", just_once=True, key="voice_{}".format(st.session_state.mic_key))
             if text:
                 raw_query = text.lower().strip()
                 numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
@@ -213,6 +208,9 @@ else:
                     price_to_add = -found_price if st.session_state.return_mode else found_price
                     st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
                     st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
+                else:
+                    st.error("⚠️ Η τιμή δεν αναγνωρίστηκε")
+                    speak_text("Η τιμή δεν αναγνωρίστηκε")
 
         st.divider()
         menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"]
@@ -223,6 +221,7 @@ else:
         
         if st.button("❌ Έξοδος / Κλείδωμα", use_container_width=True): 
             st.session_state.logged_in = False
+            st.session_state.cart = []
             st.rerun()
 
     # --- VIEW ROUTING ---
@@ -231,31 +230,173 @@ else:
             st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to_normal, use_container_width=True)
             st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
         else:
-            st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
+            st.markdown("<div class='status-header'>Πελάτης: {}</div>".format(st.session_state.cust_name), unsafe_allow_html=True)
             
         cl, cr = st.columns([1, 1.5])
         with cl:
             if st.session_state.selected_cust_id is None:
-                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key=f"ph_{st.session_state.ph_key}")
+                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key="ph_{}".format(st.session_state.ph_key))
                 if ph:
                     clean_ph = ''.join(filter(str.isdigit, ph))
                     if len(clean_ph) == 10:
                         res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
                         if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
                         else: new_customer_popup(clean_ph)
+                    else:
+                        st.error("⚠️ Το τηλέφωνο πρέπει να έχει 10 ψηφία")
+                        speak_text("Λάθος τηλέφωνο")
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
-                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
-                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+                st.button("👤 {} (Αλλαγή)".format(st.session_state.cust_name), on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                bc = st.text_input("Barcode", key="bc_{}".format(st.session_state.bc_key))
                 if bc and supabase:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
                     if res.data: 
                         val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
                         st.session_state.cart.append({'bc': res.data[0]['barcode'], 'name': res.data[0]['name'].upper(), 'price': val})
                         st.session_state.bc_key += 1; st.rerun()
+                    else:
+                        st.error("⚠️ Το Barcode δεν υπάρχει στην αποθήκη")
+                        speak_text("Το Barcode δεν υπάρχει")
                 for idx, item in enumerate(st.session_state.cart):
-                    if st.button(f"❌ {item['name']} {item['price']}€", key=f"del_{idx}", use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
+                    if st.button("❌ {} {}€".format(item['name'], item['price']), key="del_{}".format(idx), use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
                 if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
-            total = sum
+            total = sum(i['price'] for i in st.session_state.cart)
+            lines = ["{:20} | {:>6.2f}€".format(i['name'][:20], i['price']) for i in st.session_state.cart]
+            st.markdown("<div class='cart-area'>{:20} | {:>6}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*30, '\n'.join(lines)), unsafe_allow_html=True)
+            st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
+
+    elif current_view == "📊 MANAGER" and supabase:
+        st.title("📊 Αναφορές")
+        res_s = supabase.table("sales").select("*").execute()
+        res_c = supabase.table("customers").select("id, name").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
+            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
+            df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
+            df['ΠΡΑΞΗ'] = df.groupby('ΗΜΕΡΟΜΗΝΙΑ')['s_date'].transform(lambda x: pd.factorize(x)[0] + 1)
+            today_date = get_athens_now().date()
+            
+            t1, t2, t3 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ", "📈 INSIGHTS"])
+            with t1:
+                tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
+                if not tdf.empty:
+                    m_t, c_t = tdf[tdf['method'] == 'Μετρητά'], tdf[tdf['method'] == 'Κάρτα']
+                    st.markdown("<div class='report-stat' style='border: 2px solid #2ecc71;'><div style='color:#2ecc71; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΗΜΕΡΑΣ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(tdf['final_item_price'].sum()), unsafe_allow_html=True)
+                    c1, c2, c3 = st.columns(3)
+                    c1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(m_t['final_item_price'].sum(), m_t['s_date'].nunique()), unsafe_allow_html=True)
+                    c2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(c_t['final_item_price'].sum(), c_t['s_date'].nunique()), unsafe_allow_html=True)
+                    c3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(tdf['discount'].sum()), unsafe_allow_html=True)
+                    st.dataframe(tdf[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+                else: st.info("Δεν υπάρχουν πωλήσεις σήμερα.")
+
+            with t2:
+                cs, ce = st.columns(2)
+                sd, ed = cs.date_input("Από", today_date-timedelta(days=7), key="rep_start"), ce.date_input("Έως", today_date, key="rep_end")
+                p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
+                if not p_df.empty:
+                    st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
+                    p_mt, p_ct = p_df[p_df['method'] == 'Μετρητά'], p_df[p_df['method'] == 'Κάρτα']
+                    pc1, pc2, pc3 = st.columns(3)
+                    pc1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(p_mt['final_item_price'].sum(), p_mt['s_date'].nunique()), unsafe_allow_html=True)
+                    pc2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(p_ct['final_item_price'].sum(), p_ct['s_date'].nunique()), unsafe_allow_html=True)
+                    pc3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(p_df['discount'].sum()), unsafe_allow_html=True)
+                    st.divider()
+                    for d_day in sorted(p_df['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True):
+                        d_df = p_df[p_df['ΗΜΕΡΟΜΗΝΙΑ'] == d_day].copy()
+                        dm_t, dc_t = d_df[d_df['method'] == 'Μετρητά'], d_df[d_df['method'] == 'Κάρτα']
+                        st.markdown("<div class='day-header'>📅 {} | Σύνολο: {:.2f}€</div>".format(d_day.strftime('%d/%m/%Y'), d_df['final_item_price'].sum()), unsafe_allow_html=True)
+                        sc1, sc2, sc3 = st.columns(3)
+                        sc1.markdown("<div class='report-stat' style='padding:10px;'>💵 Μετρητά<div class='stat-val' style='font-size:18px;'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(dm_t['final_item_price'].sum(), dm_t['s_date'].nunique()), unsafe_allow_html=True)
+                        sc2.markdown("<div class='report-stat' style='padding:10px;'>💳 Κάρτα<div class='stat-val' style='font-size:18px;'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(dc_t['final_item_price'].sum(), dc_t['s_date'].nunique()), unsafe_allow_html=True)
+                        sc3.markdown("<div class='report-stat' style='padding:10px;'>📉 Εκπτώσεις<div class='stat-val' style='font-size:18px; color:#e74c3c;'>{:.2f}€</div></div>".format(d_df['discount'].sum()), unsafe_allow_html=True)
+                        st.dataframe(d_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+            with t3:
+                st.subheader("📈 Ανάλυση Δεδομένων")
+                ix1, ix2 = st.columns(2)
+                i_sd = ix1.date_input("Από", today_date-timedelta(days=30), key="ins_start")
+                i_ed = ix2.date_input("Έως", today_date, key="ins_end")
+                idf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= i_sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= i_ed)].copy()
+                
+                if not idf.empty:
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("Συν. Τζίρος", f"{idf['final_item_price'].sum():.2f}€")
+                    m2.metric("Μέση Πώληση", f"{(idf['final_item_price'].sum() / idf['s_date'].nunique()):.2f}€")
+                    m3.metric("Πλήθος Πράξεων", idf['s_date'].nunique())
+                    
+                    st.divider()
+                    col_ins1, col_ins2 = st.columns(2)
+                    with col_ins1:
+                        top_items_val = idf.groupby('item_name')['final_item_price'].sum().nlargest(10).reset_index()
+                        fig1 = px.bar(top_items_val, x='final_item_price', y='item_name', orientation='h', title="Top 10 Προϊόντα (€)", color_discrete_sequence=['#2ecc71'])
+                        st.plotly_chart(fig1, use_container_width=True)
+                    with col_ins2:
+                        top_items_qty = idf.groupby('item_name').size().nlargest(10).reset_index(name='qty')
+                        fig4 = px.bar(top_items_qty, x='qty', y='item_name', orientation='h', title="Top 10 Προϊόντα (Τεμάχια)", color_discrete_sequence=['#e67e22'])
+                        st.plotly_chart(fig4, use_container_width=True)
+
+                    col_ins3, col_ins4 = st.columns(2)
+                    with col_ins3:
+                        fig2 = px.pie(idf, values='final_item_price', names='method', title="Τζίρος ανά Μέθοδο", color_discrete_map={'Μετρητά':'#f1c40f', 'Κάρτα':'#3498db'})
+                        st.plotly_chart(fig2, use_container_width=True)
+                    with col_ins4:
+                        trend = idf.groupby('ΗΜΕΡΟΜΗΝΙΑ')['final_item_price'].sum().reset_index()
+                        fig3 = px.line(trend, x='ΗΜΕΡΟΜΗΝΙΑ', y='final_item_price', title="Πορεία Τζίρου", markers=True)
+                        st.plotly_chart(fig3, use_container_width=True)
+                else:
+                    st.warning("Δεν υπάρχουν δεδομένα για την επιλεγμένη περίοδο.")
+
+    elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        c1,c2,c3,c4 = st.columns(4)
+        b, n = c1.text_input("BC"), c2.text_input("Όνομα")
+        p, s = c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=-999)
+        if st.button("Προσθήκη", use_container_width=True):
+            if b and n:
+                try:
+                    supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                    st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+                except Exception as e: st.error("Σφάλμα: {}".format(e))
+        st.divider()
+        res = supabase.table("inventory").select("*").execute()
+        if res.data:
+            for _, r in pd.DataFrame(res.data).sort_values(by='name').iterrows():
+                col1, col2 = st.columns([5, 1])
+                stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
+                txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
+                with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
+                with col2:
+                    if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
+                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        st.title("👥 Διαχείριση Πελατών")
+        res_c = supabase.table("customers").select("*").execute()
+        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
+        if res_c.data:
+            sales_data = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
+            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
+                pts = int(sales_data[sales_data['cust_id'] == r['id']]['final_item_price'].sum() // 10)
+                col1, col2, col3 = st.columns([5, 1, 1])
+                with col1: st.markdown("<div class='data-row'>👤 {} | 📞 {} | ⭐ {} pts</div>".format(r['name'], r['phone'], pts), unsafe_allow_html=True)
+                with col2:
+                    if st.button("⭐", key="pts_{}".format(r['id']), use_container_width=True):
+                        show_customer_history(r['id'], r['name'])
+                with col3:
+                    if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
+                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+
+    elif current_view == "⚙️ SYSTEM" and supabase:
+        st.title("⚙️ Ρυθμίσεις Συστήματος")
+        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
+            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
+            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
+                if st.button("ΕΚΤΕΛΕΣΗ"):
+                    supabase.table(target.lower()).delete().neq("id", -1).execute()
+                    st.success("Έγινε!"); time.sleep(1); st.rerun()
