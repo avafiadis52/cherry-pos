@@ -213,7 +213,7 @@ else:
                     speak_text("Η τιμή δεν αναγνωρίστηκε")
 
         st.divider()
-        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"]
+        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "📈 INSIGHTS", "⚙️ SYSTEM"]
         def_idx = 1 if st.session_state.return_mode else 0
         view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
@@ -280,7 +280,7 @@ else:
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             today_date = get_athens_now().date()
             
-            t1, t2, t3 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ", "📈 INSIGHTS"])
+            t1, t2 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ"])
             with t1:
                 tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today_date].copy()
                 if not tdf.empty:
@@ -301,76 +301,11 @@ else:
                     st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
                     st.dataframe(p_df[['s_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']], use_container_width=True, hide_index=True)
 
-            with t3:
-                st.subheader("📊 Ανάλυση Πωλήσεων")
-                col_a, col_b = st.columns(2)
-                # Best Sellers
-                bs = df.groupby('item_name').agg({'final_item_price': 'sum', 'barcode': 'count'}).rename(columns={'barcode': 'τεμάχια', 'final_item_price': 'τζίρος'}).sort_values('τεμάχια', ascending=False).head(5)
-                with col_a:
-                    st.markdown("**Top 5 Προϊόντα**")
-                    st.table(bs)
-                # Payment Pie
-                with col_b:
-                    fig_p = px.pie(df, values='final_item_price', names='method', title='Τζίρος ανά Μέθοδο', color_discrete_sequence=['#2ecc71', '#3498db'])
-                    fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-                    st.plotly_chart(fig_p, use_container_width=True)
-                
-                st.divider()
-                # Peak Hours Analysis
-                df['hour'] = df['s_date_dt'].dt.hour
-                hs = df.groupby('hour')['final_item_price'].sum().reset_index()
-                fig_l = px.line(hs, x='hour', y='final_item_price', title='Τζίρος ανά Ώρα (Ώρες Αιχμής)', markers=True)
-                fig_l.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', xaxis=dict(dtick=1))
-                st.plotly_chart(fig_l, use_container_width=True)
-                
-                # Avg Receipt
-                avg_r = df.groupby('s_date')['final_item_price'].sum().mean()
-                st.markdown(f"<div class='report-stat'>🧾 Μέση Απόδειξη: <span class='stat-val'>{avg_r:.2f}€</span></div>", unsafe_allow_html=True)
-
-    elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
-        st.title("📦 Διαχείριση Αποθήκης")
-        c1,c2,c3,c4 = st.columns(4)
-        b, n = c1.text_input("BC"), c2.text_input("Όνομα")
-        p, s = c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=-999)
-        if st.button("Προσθήκη"):
-            if b and n:
-                try:
-                    supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
-                    st.success("Έγινε!"); time.sleep(0.5); st.rerun()
-                except Exception as e: st.error(f"Σφάλμα: {e}")
-        st.divider()
-        res = supabase.table("inventory").select("*").execute()
-        if res.data:
-            for _, r in pd.DataFrame(res.data).sort_values(by='name').iterrows():
-                col1, col2 = st.columns([5, 1])
-                stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
-                txt = f"📦 {r['barcode']} | {r['name']} | {r['price']:.2f}€ | Stock: <span style='color:{stk_c};'>{r['stock']}</span>"
-                with col1: st.markdown(f"<div class='data-row'>{txt}</div>", unsafe_allow_html=True)
-                with col2:
-                    if st.button("❌", key=f"inv_{r['barcode']}"):
-                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
-        st.title("👥 Διαχείριση Πελατών")
-        res_c = supabase.table("customers").select("*").execute()
-        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
-        if res_c.data:
-            sd = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
-            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
-                pts = int(sd[sd['cust_id'] == r['id']]['final_item_price'].sum() // 10)
-                c1, c2, c3 = st.columns([5, 1, 1])
-                with c1: st.markdown(f"<div class='data-row'>👤 {r['name']} | 📞 {r['phone']} | ⭐ {pts} pts</div>", unsafe_allow_html=True)
-                with c2:
-                    if st.button("⭐", key=f"pts_{r['id']}"): show_customer_history(r['id'], r['name'])
-                with c3:
-                    if st.button("❌", key=f"d_{r['id']}"):
-                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-
-    elif current_view == "⚙️ SYSTEM" and supabase:
-        st.title("⚙️ Ρυθμίσεις Συστήματος")
-        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
-            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
-            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
-                if st.button("ΕΚΤΕΛΕΣΗ"):
-                    supabase.table(target.lower()).delete().neq("id", -1).execute()
-                    st.success("Έγινε!"); time.sleep(1); st.rerun()
+    elif current_view == "📈 INSIGHTS" and supabase:
+        st.title("📈 Στατιστική Ανάλυση (Insights)")
+        res_s = supabase.table("sales").select("*").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            
+            st.subheader("📊 Ανάλυση Π
