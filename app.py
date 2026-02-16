@@ -36,10 +36,12 @@ st.markdown("""
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     
+    /* ΑΛΛΑΓΗ: Έντονο χρώμα στις τιμές των metrics (Τζίρος, Μέση Πώληση, Πράξεις) */
     [data-testid="stMetricValue"] {
         color: #00ff00 !important;
         font-weight: 900 !important;
-        font-size: 2rem !important;
+        font-size: 2.2rem !important;
+        text-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
     }
 
     .cart-area { 
@@ -67,7 +69,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- Session States ---
+# Session States
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
@@ -111,7 +113,7 @@ def play_sound(url):
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
-    st.write(f"Το τηλέφωνο **{phone}** δεν υπάρχει στη βάση.")
+    st.write("Το τηλέφωνο **{}** δεν υπάρχει στη βάση.".format(phone))
     name = st.text_input("Ονοματεπώνυμο Πελάτη")
     if st.button("Καταχώρηση & Συνέχεια", use_container_width=True):
         if name:
@@ -122,7 +124,7 @@ def new_customer_popup(phone):
                     st.session_state.cust_name = res.data[0]['name']
                     st.success("Ο πελάτης καταχωρήθηκε!")
                     time.sleep(1); st.rerun()
-            except Exception as e: st.error(f"Σφάλμα: {e}")
+            except Exception as e: st.error("Σφάλμα: {}".format(e))
         else: st.warning("Παρακαλώ δώστε όνομα.")
 
 def finalize(disc_val, method):
@@ -147,12 +149,12 @@ def finalize(disc_val, method):
         speak_text("Επιτυχής Πληρωμή", play_beep=False)
         play_sound("https://www.soundjay.com/misc/sounds/magic-chime-01.mp3")
         time.sleep(1.5); reset_app()
-    except Exception as e: st.error(f"Σφάλμα: {e}")
+    except Exception as e: st.error("Σφάλμα: {}".format(e))
 
 @st.dialog("💰 Πληρωμή")
 def payment_popup():
     total = sum(i['price'] for i in st.session_state.cart)
-    st.markdown(f"<h3 style='text-align:center;'>Σύνολο: {total:.2f}€</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center;'>Σύνολο: {:.2f}€</h3>".format(total), unsafe_allow_html=True)
     st.write("Θέλετε έκπτωση;")
     opt = st.radio("Επιλογή", ["ΟΧΙ", "ΝΑΙ"], horizontal=True, label_visibility="collapsed")
     disc = 0.0
@@ -164,7 +166,7 @@ def payment_popup():
                 else: disc = round(float(inp), 2)
             except: st.error("Λάθος μορφή")
     final_p = round(total - disc, 2)
-    st.markdown(f"<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {final_p:.2f}€</div>", unsafe_allow_html=True)
+    st.markdown("<div class='final-amount-popup'>ΠΛΗΡΩΤΕΟ: {:.2f}€</div>".format(final_p), unsafe_allow_html=True)
     st.divider()
     c1, c2 = st.columns(2)
     if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
@@ -184,71 +186,3 @@ def show_customer_history(c_id, c_name):
 # --- 5. LOGIN LOGIC ---
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1, 1, 1])
-    with c2:
-        st.markdown("<h1 style='text-align:center;'>🔒 CHERRY LOGIN</h1>", unsafe_allow_html=True)
-        pwd = st.text_input("Εισάγετε τον κωδικό πρόσβασης", type="password")
-        if st.button("Είσοδος", use_container_width=True):
-            if pwd == "CHERRY123":
-                st.session_state.logged_in = True
-                st.success("Επιτυχής σύνδεση!")
-                time.sleep(0.5); st.rerun()
-            else:
-                st.error("❌ Λάθος κωδικός")
-                speak_text("Λάθος κωδικός")
-else:
-    # --- 6. MAIN UI ---
-    with st.sidebar:
-        st.markdown(f"<div class='sidebar-date'>{get_athens_now().strftime('%d/%m/%Y %H:%M:%S')}</div>", unsafe_allow_html=True)
-        st.subheader("🎙️ Φωνητική Εντολή")
-        if HAS_MIC:
-            text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", just_once=True, key=f"voice_{st.session_state.mic_key}")
-            if text:
-                raw_query = text.lower().strip()
-                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", raw_query)
-                num_map = {"ένα":1, "δυο":2, "δύο":2, "τρία":3, "τέσσερα":4, "πέντε":5, "δέκα":10, "είκοσι":20, "τριάντα":30, "σαράντα":40, "πενήντα":50, "εκατό":100}
-                found_price = float(numbers[0]) if numbers else next((float(v) for k, v in num_map.items() if k in raw_query), None)
-                if found_price:
-                    clean_name = raw_query
-                    if numbers: clean_name = clean_name.replace(numbers[0], "")
-                    for w in ["ευρώ", "ευρω", "τιμή", "τιμη"] + list(num_map.keys()): clean_name = clean_name.replace(w, "")
-                    price_to_add = -found_price if st.session_state.return_mode else found_price
-                    st.session_state.cart.append({'bc': 'VOICE', 'name': clean_name.strip().upper() or "ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", 'price': price_to_add})
-                    st.session_state.mic_key += 1; time.sleep(0.4); st.rerun()
-                else:
-                    st.error("⚠️ Η τιμή δεν αναγνωρίστηκε")
-                    speak_text("Η τιμή δεν αναγνωρίστηκε")
-
-        st.divider()
-        menu_options = ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"]
-        def_idx = 1 if st.session_state.return_mode else 0
-        view = st.radio("Μενού", menu_options, index=def_idx, key="sidebar_nav")
-        st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
-        current_view = view if view != "🔄 ΕΠΙΣΤΡΟΦΗ" else "🛒 ΤΑΜΕΙΟ"
-        
-        if st.button("❌ Έξοδος / Κλείδωμα", use_container_width=True): 
-            st.session_state.logged_in = False
-            st.session_state.cart = []
-            st.rerun()
-
-    # --- VIEW ROUTING ---
-    if current_view == "🛒 ΤΑΜΕΙΟ":
-        if st.session_state.return_mode:
-            st.button("🔄 ΛΕΙΤΟΥΡΓΙΑ ΕΠΙΣΤΡΟΦΗΣ (ΠΑΤΗΣΤΕ ΓΙΑ ΚΑΝΟΝΙΚΟ ΤΑΜΕΙΟ)", on_click=switch_to_normal, use_container_width=True)
-            st.error("⚠️ ΤΩΡΑ ΣΚΑΝΑΡΕΤΕ ΤΗΝ ΕΠΙΣΤΡΟΦΗ (ΑΡΝΗΤΙΚΗ ΤΙΜΗ)")
-        else:
-            st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name}</div>", unsafe_allow_html=True)
-            
-        cl, cr = st.columns([1, 1.5])
-        with cl:
-            if st.session_state.selected_cust_id is None:
-                ph = st.text_input("Τηλέφωνο (10 ψηφία)", key=f"ph_{st.session_state.ph_key}")
-                if ph:
-                    clean_ph = ''.join(filter(str.isdigit, ph))
-                    if len(clean_ph) == 10:
-                        res = supabase.table("customers").select("*").eq("phone", clean_ph).execute()
-                        if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
-                        else: new_customer_popup(clean_ph)
-                    else:
-                        st.error("⚠️ Το τηλέφωνο πρέπει να έχει 10 ψηφία")
-                        speak_text("Λάθος τηλέφωνο")
-                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id =
