@@ -316,4 +316,64 @@ else:
                     st.markdown("**Top 5 Προϊόντα**")
                     st.table(bs)
                 with col_b:
-                    fig_p = px.pie(df, values='final_item_price', names='method',
+                    fig_p = px.pie(df, values='final_item_price', names='method', title='Τζίρος ανά Μέθοδο', color_discrete_sequence=['#2ecc71', '#3498db'])
+                    fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
+                    st.plotly_chart(fig_p, use_container_width=True)
+                df['hour'] = df['s_date_dt'].dt.hour
+                hs = df.groupby('hour')['final_item_price'].sum().reset_index()
+                fig_l = px.line(hs, x='hour', y='final_item_price', title='Ώρες Αιχμής', markers=True)
+                fig_l.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
+                st.plotly_chart(fig_l, use_container_width=True)
+                avg_r = df.groupby('s_date')['final_item_price'].sum().mean()
+                st.markdown(f"<div class='report-stat'>🧾 Μέση Απόδειξη: <span class='stat-val'>{avg_r:.2f}€</span></div>", unsafe_allow_html=True)
+        else:
+            st.info("Δεν υπάρχουν πωλήσεις για εμφάνιση στατιστικών.")
+
+    elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        c1,c2,c3,c4 = st.columns(4)
+        b, n = c1.text_input("BC"), c2.text_input("Όνομα")
+        p, s = c3.number_input("Τιμή", min_value=0.0), c4.number_input("Stock", min_value=-999)
+        if st.button("Προσθήκη", use_container_width=True):
+            if b and n:
+                try:
+                    supabase.table("inventory").upsert({"barcode": str(b), "name": str(n).upper(), "price": float(p), "stock": int(s)}).execute()
+                    st.success("Αποθηκεύτηκε!"); time.sleep(0.5); st.rerun()
+                except Exception as e: st.error("Σφάλμα: {}".format(e))
+        st.divider()
+        res = supabase.table("inventory").select("*").execute()
+        if res.data:
+            for _, r in pd.DataFrame(res.data).sort_values(by='name').iterrows():
+                col1, col2 = st.columns([5, 1])
+                stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
+                txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
+                with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
+                with col2:
+                    if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
+                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+
+    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        st.title("👥 Διαχείριση Πελατών")
+        res_c = supabase.table("customers").select("*").execute()
+        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
+        if res_c.data:
+            sales_data = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
+            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
+                pts = int(sales_data[sales_data['cust_id'] == r['id']]['final_item_price'].sum() // 10)
+                col1, col2, col3 = st.columns([5, 1, 1])
+                with col1: st.markdown("<div class='data-row'>👤 {} | 📞 {} | ⭐ {} pts</div>".format(r['name'], r['phone'], pts), unsafe_allow_html=True)
+                with col2:
+                    if st.button("⭐", key="pts_{}".format(r['id']), use_container_width=True):
+                        show_customer_history(r['id'], r['name'])
+                with col3:
+                    if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
+                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+
+    elif current_view == "⚙️ SYSTEM" and supabase:
+        st.title("⚙️ Ρυθμίσεις Συστήματος")
+        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
+            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
+            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
+                if st.button("ΕΚΤΕΛΕΣΗ"):
+                    supabase.table(target.lower()).delete().neq("id", -1).execute()
+                    st.success("Έγινε!"); time.sleep(1); st.rerun()
