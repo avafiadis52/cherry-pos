@@ -59,12 +59,11 @@ st.markdown("""
     table { color: white !important; }
     thead tr th { color: white !important; background-color: #333 !important; }
 
-    /* Αλλαγή για εντονότερο χρώμα στα metrics των Insights */
+    /* ΕΝΤΟΝΟ ΧΡΩΜΑ ΓΙΑ ΤΑ METRICS ΣΤΑ INSIGHTS */
     [data-testid="stMetricValue"] {
-        color: #00ff41 !important;
-        font-weight: 900 !important;
-        font-size: 2rem !important;
-        text-shadow: 1px 1px 5px rgba(0,255,65,0.3);
+        color: #00ff00 !important; 
+        font-weight: 800 !important;
+        text-shadow: 0px 0px 10px rgba(0, 255, 0, 0.2);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -308,4 +307,7 @@ else:
                 sd, ed = cs.date_input("Από", today_date-timedelta(days=7), key="rep_start"), ce.date_input("Έως", today_date, key="rep_end")
                 p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
                 if not p_df.empty:
-                    st.markdown("<div class
+                    st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
+                    p_mt, p_ct = p_df[p_df['method'] == 'Μετρητά'], p_df[p_df['method'] == 'Κάρτα']
+                    pc1, pc2, pc3 = st.columns(3)
+                    pc1.markdown("<div class='report-stat'>💵 Μετρητά<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>
