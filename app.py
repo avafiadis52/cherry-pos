@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.66) ---
-st.set_page_config(page_title="CHERRY v14.2.66", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.67) ---
+st.set_page_config(page_title="CHERRY v14.2.67", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -247,7 +247,7 @@ else:
                         speak_text("Λάθος τηλέφωνο")
                 if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
             else:
-                st.button("👤 {} (Αλλαγή)".format(st.session_state.cust_name), on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}), use_container_width=True)
                 bc = st.text_input("Barcode", key="bc_{}".format(st.session_state.bc_key))
                 if bc and supabase:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
@@ -261,4 +261,22 @@ else:
                 for idx, item in enumerate(st.session_state.cart):
                     if st.button("❌ {} {}€".format(item['name'], item['price']), key="del_{}".format(idx), use_container_width=True): st.session_state.cart.pop(idx); st.rerun()
                 if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
-            if st.button("
+            if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+        with cr:
+            total = sum(i['price'] for i in st.session_state.cart)
+            lines = ["{:20} | {:>6.2f}€".format(i['name'][:20], i['price']) for i in st.session_state.cart]
+            st.markdown("<div class='cart-area'>{:20} | {:>6}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*30, '\n'.join(lines)), unsafe_allow_html=True)
+            st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
+
+    elif current_view == "📊 MANAGER" and supabase:
+        st.title("📊 Αναφορές & Insights")
+        res_s = supabase.table("sales").select("*").execute()
+        res_c = supabase.table("customers").select("id, name").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
+            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
+            df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
+            df['ΠΡΑΞ
