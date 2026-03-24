@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.69) ---
-st.set_page_config(page_title="CHERRY v14.2.69", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.70) ---
+st.set_page_config(page_title="CHERRY v14.2.70", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -277,8 +277,9 @@ else:
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
             total = sum(i['price'] for i in st.session_state.cart)
-            lines = ["{:45} | {:>8.2f}€".format(i['name'][:45], i['price']) for i in st.session_state.cart]
-            st.markdown("<div class='cart-area'>{:45} | {:>8}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*56, '\n'.join(lines)), unsafe_allow_html=True)
+            # ΔΙΟΡΘΩΣΗ: Μετατόπιση 4 θέσεις αριστερά (από 8 σε 4 στο format)
+            lines = ["{:45} | {:>4.2f}€".format(i['name'][:45], i['price']) for i in st.session_state.cart]
+            st.markdown("<div class='cart-area'>{:45} | {:>4}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*56, '\n'.join(lines)), unsafe_allow_html=True)
             st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
 
     elif current_view == "📊 MANAGER" and supabase:
