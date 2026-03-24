@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.65) ---
-st.set_page_config(page_title="CHERRY v14.2.65", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.66) ---
+st.set_page_config(page_title="CHERRY v14.2.66", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -270,11 +270,19 @@ else:
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
             total = sum(i['price'] for i in st.session_state.cart)
-            # ΑΛΛΑΓΗ: 45 χαρακτήρες για Είδος και μετακίνηση Τιμής 5 θέσεις αριστερά
             lines = ["{:45} | {:>8.2f}€".format(i['name'][:45], i['price']) for i in st.session_state.cart]
             st.markdown("<div class='cart-area'>{:45} | {:>8}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*56, '\n'.join(lines)), unsafe_allow_html=True)
             st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
 
     elif current_view == "📊 MANAGER" and supabase:
         st.title("📊 Αναφορές")
-        res_s = supabase.table("sales").select("*
+        res_s = supabase.table("sales").select("*").execute()
+        res_c = supabase.table("customers").select("id, name").execute()
+        if res_s.data:
+            df = pd.DataFrame(res_s.data)
+            cust_dict = {c['id']: c['name'] for c in res_c.data} if res_c.data else {}
+            df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
+            df['s_date_dt'] = pd.to_datetime(df['s_date'])
+            df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
+            df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
+            df['ΠΡΑΞΗ'] = df.groupby('
