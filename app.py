@@ -123,14 +123,14 @@ def finalize(disc_val, method):
     if not supabase: return
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
-    ts = get_athens_now().strftime("%Y-%m-%d %H:%M:%S")
+    # Χρήση της χειροκίνητης ημερομηνίας αν υπάρχει, αλλιώς τρέχουσα
+    ts = st.session_state.get('manual_ts', get_athens_now()).strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
         for i in st.session_state.cart:
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
-            # supabase.table("sales").insert(data).execute() # Commented for safety or replace with execution
             supabase.table("sales").insert(data).execute()
             if i['bc'] != 'VOICE':
                 res_inv = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
@@ -193,7 +193,16 @@ if not st.session_state.logged_in:
 else:
     # --- 6. MAIN UI ---
     with st.sidebar:
-        st.markdown("<div class='sidebar-date'>{}</div>".format(get_athens_now().strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
+        # Χειροκίνητη αλλαγή ημερομηνίας και ώρας
+        current_athens = get_athens_now()
+        chosen_date = st.date_input("Ημερομηνία", value=current_athens.date())
+        chosen_time = st.time_input("Ώρα", value=current_athens.time())
+        # Συνδυασμός σε datetime object για χρήση στην εφαρμογή
+        st.session_state.manual_ts = datetime.combine(chosen_date, chosen_time)
+        
+        # Εμφάνιση επάνω αριστερά με κίτρινα γράμματα (χρησιμοποιεί την επιλεγμένη ώρα)
+        st.markdown("<div class='sidebar-date'>{}</div>".format(st.session_state.manual_ts.strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
+        
         st.subheader("🎙️ Φωνητική Εντολή")
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="🔴 ΠΑΤΑ ΚΑΙ ΜΙΛΑ", stop_prompt="🟢 ΕΠΕΞΕΡΓΑΣΙΑ...", just_once=True, key="voice_{}".format(st.session_state.mic_key))
@@ -281,7 +290,7 @@ else:
             df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
             df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
             df['ΠΡΑΞΗ'] = df.groupby('ΗΜΕΡΟΜΗΝΙΑ')['s_date'].transform(lambda x: pd.factorize(x)[0] + 1)
-            today_date = get_athens_now().date()
+            today_date = st.session_state.get('manual_ts', get_athens_now()).date()
             
             t1, t2, t3 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΑΝΑΦΟΡΑ ΠΕΡΙΟΔΟΥ", "📈 INSIGHTS"])
             with t1:
@@ -298,16 +307,7 @@ else:
 
             with t2:
                 cs, ce = st.columns(2)
-                # ΑΛΛΑΓΗ: Χρήση text_input αντί για date_input για χειροκίνητη εισαγωγή
-                sd_str = cs.text_input("Από (YYYY-MM-DD)", value=(today_date-timedelta(days=7)).strftime('%Y-%m-%d'), key="rep_start")
-                ed_str = ce.text_input("Έως (YYYY-MM-DD)", value=today_date.strftime('%Y-%m-%d'), key="rep_end")
-                try:
-                    sd = datetime.strptime(sd_str, '%Y-%m-%d').date()
-                    ed = datetime.strptime(ed_str, '%Y-%m-%d').date()
-                except:
-                    st.error("⚠️ Λάθος μορφή ημερομηνίας. Χρησιμοποιήστε YYYY-MM-DD")
-                    sd, ed = today_date, today_date
-
+                sd, ed = cs.date_input("Από", today_date-timedelta(days=7), key="rep_start"), ce.date_input("Έως", today_date, key="rep_end")
                 p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
                 if not p_df.empty:
                     st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
