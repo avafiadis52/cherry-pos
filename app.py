@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.63) ---
-st.set_page_config(page_title="CHERRY v14.2.63", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.64) ---
+st.set_page_config(page_title="CHERRY v14.2.64", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -270,9 +270,9 @@ else:
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
             total = sum(i['price'] for i in st.session_state.cart)
-            # ΑΛΛΑΓΗ: Αύξηση πλάτους περιγραφής και μετατόπιση τιμής δεξιά
-            lines = ["{:35} | {:>8.2f}€".format(i['name'][:35], i['price']) for i in st.session_state.cart]
-            st.markdown("<div class='cart-area'>{:35} | {:>8}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*46, '\n'.join(lines)), unsafe_allow_html=True)
+            # ΑΛΛΑΓΗ: 50 χαρακτήρες για Είδος και μετατόπιση Τιμής δεξιά
+            lines = ["{:50} | {:>8.2f}€".format(i['name'][:50], i['price']) for i in st.session_state.cart]
+            st.markdown("<div class='cart-area'>{:50} | {:>8}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*61, '\n'.join(lines)), unsafe_allow_html=True)
             st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
 
     elif current_view == "📊 MANAGER" and supabase:
@@ -397,13 +397,4 @@ else:
                         show_customer_history(r['id'], r['name'])
                 with col3:
                     if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
-                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-
-    elif current_view == "⚙️ SYSTEM" and supabase:
-        st.title("⚙️ Ρυθμίσεις Συστήματος")
-        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
-            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
-            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
-                if st.button("ΕΚΤΕΛΕΣΗ"):
-                    supabase.table(target.lower()).delete().neq("id", -1).execute()
-                    st.success("Έγινε!"); time.sleep(1); st.rerun()
+                        supabase.table
