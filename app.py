@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.67) ---
-st.set_page_config(page_title="CHERRY v14.2.67", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.69) ---
+st.set_page_config(page_title="CHERRY v14.2.69", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -39,9 +39,16 @@ st.markdown("""
     .cart-area { 
         font-family: 'Courier New', monospace; 
         background-color: #000000; padding: 15px; border-radius: 10px; 
-        white-space: pre-wrap; border: 4px solid #2ecc71 !important; 
+        white-space: pre; border: 4px solid #2ecc71 !important; 
         box-shadow: 0 0 15px rgba(46, 204, 113, 0.4); min-height: 300px; 
-        font-size: 16px; color: #2ecc71; 
+        color: #2ecc71;
+        overflow-x: auto;
+        font-size: 16px;
+    }
+
+    @media only screen and (max-width: 600px) {
+        .cart-area { font-size: 2.8vw; padding: 8px; }
+        .total-label { font-size: 50px !important; }
     }
 
     .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; margin-top: 10px; text-shadow: 2px 2px 10px rgba(46, 204, 113, 0.5); }
@@ -337,24 +344,20 @@ else:
                     m3.metric("Πλήθος Πράξεων", idf['s_date'].nunique())
                     
                     st.divider()
-                    col_ins1, col_ins2 = st.columns(2)
-                    with col_ins1:
-                        top_items_val = idf.groupby('item_name')['final_item_price'].sum().nlargest(10).reset_index()
-                        fig1 = px.bar(top_items_val, x='final_item_price', y='item_name', orientation='h', title="Top 10 Προϊόντα (€)", color_discrete_sequence=['#2ecc71'])
-                        st.plotly_chart(fig1, use_container_width=True)
-                    with col_ins2:
-                        top_items_qty = idf.groupby('item_name').size().nlargest(10).reset_index(name='qty')
-                        fig4 = px.bar(top_items_qty, x='qty', y='item_name', orientation='h', title="Top 10 Προϊόντα (Τεμάχια)", color_discrete_sequence=['#e67e22'])
-                        st.plotly_chart(fig4, use_container_width=True)
+                    top_items_val = idf.groupby('item_name')['final_item_price'].sum().nlargest(10).reset_index()
+                    fig1 = px.bar(top_items_val, x='final_item_price', y='item_name', orientation='h', title="Top 10 Προϊόντα (€)", color_discrete_sequence=['#2ecc71'])
+                    st.plotly_chart(fig1, use_container_width=True)
 
-                    col_ins3, col_ins4 = st.columns(2)
-                    with col_ins3:
-                        fig2 = px.pie(idf, values='final_item_price', names='method', title="Τζίρος ανά Μέθοδο", color_discrete_map={'Μετρητά':'#f1c40f', 'Κάρτα':'#3498db'})
-                        st.plotly_chart(fig2, use_container_width=True)
-                    with col_ins4:
-                        trend = idf.groupby('ΗΜΕΡΟΜΗΝΙΑ')['final_item_price'].sum().reset_index()
-                        fig3 = px.line(trend, x='ΗΜΕΡΟΜΗΝΙΑ', y='final_item_price', title="Πορεία Τζίρου", markers=True)
-                        st.plotly_chart(fig3, use_container_width=True)
+                    top_items_qty = idf.groupby('item_name').size().nlargest(10).reset_index(name='qty')
+                    fig4 = px.bar(top_items_qty, x='qty', y='item_name', orientation='h', title="Top 10 Προϊόντα (Τεμάχια)", color_discrete_sequence=['#e67e22'])
+                    st.plotly_chart(fig4, use_container_width=True)
+
+                    fig2 = px.pie(idf, values='final_item_price', names='method', title="Τζίρος ανά Μέθοδο", color_discrete_map={'Μετρητά':'#f1c40f', 'Κάρτα':'#3498db'})
+                    st.plotly_chart(fig2, use_container_width=True)
+
+                    trend = idf.groupby('ΗΜΕΡΟΜΗΝΙΑ')['final_item_price'].sum().reset_index()
+                    fig3 = px.line(trend, x='ΗΜΕΡΟΜΗΝΙΑ', y='final_item_price', title="Πορεία Τζίρου", markers=True)
+                    st.plotly_chart(fig3, use_container_width=True)
                 else:
                     st.warning("Δεν υπάρχουν δεδομένα για την επιλεγμένη περίοδο.")
 
