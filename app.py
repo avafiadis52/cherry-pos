@@ -130,6 +130,7 @@ def finalize(disc_val, method):
             d = round(i['price'] * ratio, 2)
             f = round(i['price'] - d, 2)
             data = {"barcode": str(i['bc']), "item_name": str(i['name']), "unit_price": float(i['price']), "discount": float(d), "final_item_price": float(f), "method": str(method), "s_date": ts, "cust_id": c_id}
+            # supabase.table("sales").insert(data).execute() # Commented for safety or replace with execution
             supabase.table("sales").insert(data).execute()
             if i['bc'] != 'VOICE':
                 res_inv = supabase.table("inventory").select("stock").eq("barcode", i['bc']).execute()
@@ -297,7 +298,16 @@ else:
 
             with t2:
                 cs, ce = st.columns(2)
-                sd, ed = cs.date_input("Από", today_date-timedelta(days=7), key="rep_start"), ce.date_input("Έως", today_date, key="rep_end")
+                # ΑΛΛΑΓΗ: Χρήση text_input αντί για date_input για χειροκίνητη εισαγωγή
+                sd_str = cs.text_input("Από (YYYY-MM-DD)", value=(today_date-timedelta(days=7)).strftime('%Y-%m-%d'), key="rep_start")
+                ed_str = ce.text_input("Έως (YYYY-MM-DD)", value=today_date.strftime('%Y-%m-%d'), key="rep_end")
+                try:
+                    sd = datetime.strptime(sd_str, '%Y-%m-%d').date()
+                    ed = datetime.strptime(ed_str, '%Y-%m-%d').date()
+                except:
+                    st.error("⚠️ Λάθος μορφή ημερομηνίας. Χρησιμοποιήστε YYYY-MM-DD")
+                    sd, ed = today_date, today_date
+
                 p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
                 if not p_df.empty:
                     st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
