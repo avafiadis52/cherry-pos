@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.62) ---
-st.set_page_config(page_title="CHERRY v14.2.62", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.63) ---
+st.set_page_config(page_title="CHERRY v14.2.63", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -123,7 +123,6 @@ def finalize(disc_val, method):
     if not supabase: return
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
-    # Χρήση της χειροκίνητης ημερομηνίας αν υπάρχει, αλλιώς τρέχουσα
     ts = st.session_state.get('manual_ts', get_athens_now()).strftime("%Y-%m-%d %H:%M:%S")
     c_id = st.session_state.selected_cust_id if st.session_state.selected_cust_id != 0 else None
     try:
@@ -193,14 +192,11 @@ if not st.session_state.logged_in:
 else:
     # --- 6. MAIN UI ---
     with st.sidebar:
-        # Χειροκίνητη αλλαγή ημερομηνίας και ώρας
         current_athens = get_athens_now()
         chosen_date = st.date_input("Ημερομηνία", value=current_athens.date())
         chosen_time = st.time_input("Ώρα", value=current_athens.time())
-        # Συνδυασμός σε datetime object για χρήση στην εφαρμογή
         st.session_state.manual_ts = datetime.combine(chosen_date, chosen_time)
         
-        # Εμφάνιση επάνω αριστερά με κίτρινα γράμματα (χρησιμοποιεί την επιλεγμένη ώρα)
         st.markdown("<div class='sidebar-date'>{}</div>".format(st.session_state.manual_ts.strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
         
         st.subheader("🎙️ Φωνητική Εντολή")
@@ -274,8 +270,9 @@ else:
             if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
         with cr:
             total = sum(i['price'] for i in st.session_state.cart)
-            lines = ["{:20} | {:>6.2f}€".format(i['name'][:20], i['price']) for i in st.session_state.cart]
-            st.markdown("<div class='cart-area'>{:20} | {:>6}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*30, '\n'.join(lines)), unsafe_allow_html=True)
+            # ΑΛΛΑΓΗ: Αύξηση πλάτους περιγραφής και μετατόπιση τιμής δεξιά
+            lines = ["{:35} | {:>8.2f}€".format(i['name'][:35], i['price']) for i in st.session_state.cart]
+            st.markdown("<div class='cart-area'>{:35} | {:>8}\n{}\n{}</div>".format('Είδος', 'Τιμή', '-'*46, '\n'.join(lines)), unsafe_allow_html=True)
             st.markdown("<div class='total-label'>{:.2f}€</div>".format(total), unsafe_allow_html=True)
 
     elif current_view == "📊 MANAGER" and supabase:
