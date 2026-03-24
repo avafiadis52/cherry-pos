@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.2.67) ---
-st.set_page_config(page_title="CHERRY v14.2.67", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.68 - Mobile Optimized) ---
+st.set_page_config(page_title="CHERRY v14.2.68", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -36,12 +36,24 @@ st.markdown("""
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
     
+    /* ΔΙΟΡΘΩΣΗ ΓΙΑ MOBILE: Responsive γραμματοσειρά στο πράσινο παράθυρο */
     .cart-area { 
         font-family: 'Courier New', monospace; 
         background-color: #000000; padding: 15px; border-radius: 10px; 
-        white-space: pre-wrap; border: 4px solid #2ecc71 !important; 
+        white-space: pre; border: 4px solid #2ecc71 !important; 
         box-shadow: 0 0 15px rgba(46, 204, 113, 0.4); min-height: 300px; 
-        font-size: 16px; color: #2ecc71; 
+        color: #2ecc71;
+        overflow-x: auto;
+        font-size: 16px; /* Default μέγεθος για Desktop */
+    }
+
+    /* Αν η οθόνη είναι μικρότερη από 600px (Κινητά) */
+    @media only screen and (max-width: 600px) {
+        .cart-area {
+            font-size: 2.8vw; /* Η γραμματοσειρά προσαρμόζεται στο πλάτος της οθόνης */
+            padding: 8px;
+        }
+        .total-label { font-size: 50px !important; }
     }
 
     .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; margin-top: 10px; text-shadow: 2px 2px 10px rgba(46, 204, 113, 0.5); }
@@ -304,7 +316,7 @@ else:
             with t2:
                 cs, ce = st.columns(2)
                 sd, ed = cs.date_input("Από", today_date-timedelta(days=7), key="rep_start"), ce.date_input("Έως", today_date, key="rep_end")
-                p_df = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
+                p_df = df[(df['ΗΜΕΡΟΜΗQUOTATION_MARKΙΑ'] >= sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= ed)].sort_values('s_date_dt', ascending=False).copy()
                 if not p_df.empty:
                     st.markdown("<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{:.2f}€</div></div>".format(p_df['final_item_price'].sum()), unsafe_allow_html=True)
                     p_mt, p_ct = p_df[p_df['method'] == 'Μετρητά'], p_df[p_df['method'] == 'Κάρτα']
