@@ -26,16 +26,17 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.3.2", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.3.3", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
-    .cart-area { 
-        font-family: 'Courier New', monospace; background-color: #000; padding: 15px; border-radius: 10px; 
-        white-space: pre; border: 4px solid #2ecc71 !important; color: #2ecc71; min-height: 300px; font-size: 16px;
+    .cart-item-row { 
+        background-color: #000; padding: 10px; border-radius: 5px; margin-bottom: 5px; 
+        border: 1px solid #2ecc71; display: flex; justify-content: space-between; align-items: center;
+        font-family: 'Courier New', monospace; color: #2ecc71;
     }
     .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; text-shadow: 2px 2px 10px rgba(46, 204, 113, 0.5); }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
@@ -145,18 +146,16 @@ else:
         st.session_state.manual_ts = datetime.combine(chosen_date, chosen_time)
         st.markdown(f"<div class='sidebar-date'>{st.session_state.manual_ts.strftime('%d/%m/%Y %H:%M')}</div>", unsafe_allow_html=True)
         
-        # --- 🎙️ ΕΠΑΝΑΦΟΡΑ ΦΩΝΗΤΙΚΗΣ ΟΠΩΣ ΗΤΑΝ ---
         if HAS_MIC:
             text = speech_to_text(language='el', start_prompt="🎙️ ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", key=f"mic_{st.session_state.mic_key}")
             if text:
                 numbers = re.findall(r"[-+]?\d*\.\d+|\d+", text)
                 if numbers:
                     price = float(numbers[0])
-                    # Αφαίρεση του αριθμού από την περιγραφή
                     desc = text.replace(str(numbers[0]), "").strip().upper()
                     if not desc: desc = "ΦΩΝΗΤΙΚΗ ΚΑΤΑΧΩΡΗΣΗ"
                     final_p = -price if st.session_state.return_mode else price
-                    st.session_state.cart.append({'bc': 'VOICE', 'name': desc, 'price': final_p})
+                    st.session_state.cart.append({'id': time.time(), 'bc': 'VOICE', 'name': desc, 'price': final_p})
                     st.session_state.mic_key += 1; st.rerun()
         
         st.divider()
@@ -164,10 +163,11 @@ else:
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
         if st.button("❌ Έξοδος"): st.session_state.logged_in = False; st.rerun()
 
-    # --- VIEW ROUTING ---
+    # --- ΤΑΜΕΙΟ VIEW ---
     if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"]:
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name} {'(ΕΠΙΣΤΡΟΦΗ)' if st.session_state.return_mode else ''}</div>", unsafe_allow_html=True)
         cl, cr = st.columns([1, 1.5])
+        
         with cl:
             if st.session_state.selected_cust_id is None:
                 ph = st.text_input("Τηλέφωνο", key=f"ph_{st.session_state.ph_key}")
@@ -183,16 +183,32 @@ else:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
                     if res.data:
                         val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
-                        st.session_state.cart.append({'bc': bc, 'name': res.data[0]['name'], 'price': val})
+                        st.session_state.cart.append({'id': time.time(), 'bc': bc, 'name': res.data[0]['name'], 'price': val})
                         st.session_state.bc_key += 1; st.rerun()
-                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
-                if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+                
+                if st.session_state.cart:
+                    if st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
+                if st.button("🔄 ΑΚΥΡΩΣΗ / ΝΕΑ ΠΩΛΗΣΗ", use_container_width=True): reset_app()
+        
+        # --- ΔΕΞΙΑ ΠΛΕΥΡΑ: ΔΙΑΔΡΑΣΤΙΚΟ ΚΑΛΑΘΙ ---
         with cr:
-            total = sum(i['price'] for i in st.session_state.cart)
-            cart_text = "\n".join([f"{i['name'][:35]:35} | {i['price']:>6.2f}€" for i in st.session_state.cart])
-            st.markdown(f"<div class='cart-area'>{'ΕΙΔΟΣ':35} | {'ΤΙΜΗ':>7}\n{'-'*45}\n{cart_text}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+            st.markdown("### 🛒 Λίστα Πώλησης")
+            if not st.session_state.cart:
+                st.info("Το καλάθι είναι άδειο")
+            else:
+                for idx, item in enumerate(st.session_state.cart):
+                    col_item, col_del = st.columns([5, 1])
+                    with col_item:
+                        st.markdown(f"<div class='cart-item-row'>{item['name'][:30]:30} | {item['price']:.2f}€</div>", unsafe_allow_html=True)
+                    with col_del:
+                        if st.button("❌", key=f"del_cart_{item['id']}"):
+                            st.session_state.cart.pop(idx)
+                            st.rerun()
+                
+                total = sum(i['price'] for i in st.session_state.cart)
+                st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
+    # --- ΑΠΟΘΗΚΗ VIEW ---
     elif view == "📦 ΑΠΟΘΗΚΗ":
         st.title("📦 Αποθήκη & Ρυθμίσεις")
         t1, t2, t3 = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ ΛΙΣΤΩΝ", "📋 ΑΠΟΘΕΜΑ"])
@@ -225,6 +241,7 @@ else:
                     if c3.button("❌", key=f"del_{r['barcode']}"): 
                         supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
 
+    # --- ΥΠΟΛΟΙΠΑ VIEWS (MANAGER, ΠΕΛΑΤΕΣ, SYSTEM) ---
     elif view == "📊 MANAGER":
         st.title("📊 Αναφορές")
         if st.text_input("Κωδικός MANAGER", type="password") == "999":
