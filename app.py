@@ -26,7 +26,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.3.3", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.3.4", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -36,7 +36,7 @@ st.markdown("""
     .cart-item-row { 
         background-color: #000; padding: 10px; border-radius: 5px; margin-bottom: 5px; 
         border: 1px solid #2ecc71; display: flex; justify-content: space-between; align-items: center;
-        font-family: 'Courier New', monospace; color: #2ecc71;
+        font-family: 'Courier New', monospace; color: #2ecc71; font-size: 14px;
     }
     .total-label { font-size: 70px; font-weight: bold; color: #2ecc71; text-align: center; text-shadow: 2px 2px 10px rgba(46, 204, 113, 0.5); }
     .status-header { font-size: 20px; font-weight: bold; color: #3498db; text-align: center; margin-bottom: 10px; }
@@ -155,7 +155,8 @@ else:
                     desc = text.replace(str(numbers[0]), "").strip().upper()
                     if not desc: desc = "ΦΩΝΗΤΙΚΗ ΚΑΤΑΧΩΡΗΣΗ"
                     final_p = -price if st.session_state.return_mode else price
-                    st.session_state.cart.append({'id': time.time(), 'bc': 'VOICE', 'name': desc, 'price': final_p})
+                    # Δημιουργία μοναδικού ID για αποφυγή KeyError
+                    st.session_state.cart.append({'id': str(time.time()), 'bc': 'VOICE', 'name': desc, 'price': final_p})
                     st.session_state.mic_key += 1; st.rerun()
         
         st.divider()
@@ -166,7 +167,7 @@ else:
     # --- ΤΑΜΕΙΟ VIEW ---
     if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"]:
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name} {'(ΕΠΙΣΤΡΟΦΗ)' if st.session_state.return_mode else ''}</div>", unsafe_allow_html=True)
-        cl, cr = st.columns([1, 1.5])
+        cl, cr = st.columns([1, 1.3])
         
         with cl:
             if st.session_state.selected_cust_id is None:
@@ -183,34 +184,33 @@ else:
                     res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
                     if res.data:
                         val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
-                        st.session_state.cart.append({'id': time.time(), 'bc': bc, 'name': res.data[0]['name'], 'price': val})
+                        st.session_state.cart.append({'id': str(time.time()), 'bc': bc, 'name': res.data[0]['name'], 'price': val})
                         st.session_state.bc_key += 1; st.rerun()
                 
                 if st.session_state.cart:
                     if st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
                 if st.button("🔄 ΑΚΥΡΩΣΗ / ΝΕΑ ΠΩΛΗΣΗ", use_container_width=True): reset_app()
         
-        # --- ΔΕΞΙΑ ΠΛΕΥΡΑ: ΔΙΑΔΡΑΣΤΙΚΟ ΚΑΛΑΘΙ ---
         with cr:
-            st.markdown("### 🛒 Λίστα Πώλησης")
+            st.markdown("### 🛒 Καλάθι")
             if not st.session_state.cart:
                 st.info("Το καλάθι είναι άδειο")
             else:
-                for idx, item in enumerate(st.session_state.cart):
-                    col_item, col_del = st.columns([5, 1])
-                    with col_item:
-                        st.markdown(f"<div class='cart-item-row'>{item['name'][:30]:30} | {item['price']:.2f}€</div>", unsafe_allow_html=True)
-                    with col_del:
-                        if st.button("❌", key=f"del_cart_{item['id']}"):
-                            st.session_state.cart.pop(idx)
-                            st.rerun()
+                # Χρήση enumerate για ασφάλεια αντί για το key 'id' μόνο
+                for i, item in enumerate(st.session_state.cart):
+                    c_info, c_del = st.columns([5, 1])
+                    item_id = item.get('id', f"old_{i}") # Δικλείδα ασφαλείας για το KeyError
+                    c_info.markdown(f"<div class='cart-item-row'>{item['name'][:30]:30} | {item['price']:.2f}€</div>", unsafe_allow_html=True)
+                    if c_del.button("❌", key=f"del_{item_id}_{i}"):
+                        st.session_state.cart.pop(i)
+                        st.rerun()
                 
                 total = sum(i['price'] for i in st.session_state.cart)
                 st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
 
     # --- ΑΠΟΘΗΚΗ VIEW ---
     elif view == "📦 ΑΠΟΘΗΚΗ":
-        st.title("📦 Αποθήκη & Ρυθμίσεις")
+        st.title("📦 Αποθήκη")
         t1, t2, t3 = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ ΛΙΣΤΩΝ", "📋 ΑΠΟΘΕΜΑ"])
         with t1:
             with st.form("inv_form", clear_on_submit=True):
@@ -241,7 +241,7 @@ else:
                     if c3.button("❌", key=f"del_{r['barcode']}"): 
                         supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
 
-    # --- ΥΠΟΛΟΙΠΑ VIEWS (MANAGER, ΠΕΛΑΤΕΣ, SYSTEM) ---
+    # --- ΛΟΙΠΑ ---
     elif view == "📊 MANAGER":
         st.title("📊 Αναφορές")
         if st.text_input("Κωδικός MANAGER", type="password") == "999":
