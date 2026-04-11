@@ -26,7 +26,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.3.1", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.3.2", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -88,13 +88,9 @@ def print_label_popup(name, barcode, price):
         <h1 style="margin:10px 0;">{price:.2f} €</h1>
     </div>
     """, unsafe_allow_html=True)
-    
-    copies = st.number_input("Ποσότητα ετικετών για εκτύπωση", min_value=1, max_value=100, value=1)
-    
+    copies = st.number_input("Ποσότητα ετικετών", min_value=1, max_value=100, value=1)
     if st.button(f"🖨️ ΕΚΤΥΠΩΣΗ ({copies})", use_container_width=True):
-        st.success(f"Εκτυπώθηκαν {copies} ετικέτες για το είδος {barcode}!")
-        time.sleep(1)
-        st.rerun()
+        st.success(f"Εκτυπώθηκαν {copies} ετικέτες!"); time.sleep(1); st.rerun()
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
@@ -147,11 +143,28 @@ else:
         chosen_date = st.date_input("Ημερομηνία", value=ts_now.date())
         chosen_time = st.time_input("Ώρα", value=ts_now.time())
         st.session_state.manual_ts = datetime.combine(chosen_date, chosen_time)
+        st.markdown(f"<div class='sidebar-date'>{st.session_state.manual_ts.strftime('%d/%m/%Y %H:%M')}</div>", unsafe_allow_html=True)
+        
+        # --- 🎙️ ΕΠΑΝΑΦΟΡΑ ΦΩΝΗΤΙΚΗΣ ΟΠΩΣ ΗΤΑΝ ---
+        if HAS_MIC:
+            text = speech_to_text(language='el', start_prompt="🎙️ ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", key=f"mic_{st.session_state.mic_key}")
+            if text:
+                numbers = re.findall(r"[-+]?\d*\.\d+|\d+", text)
+                if numbers:
+                    price = float(numbers[0])
+                    # Αφαίρεση του αριθμού από την περιγραφή
+                    desc = text.replace(str(numbers[0]), "").strip().upper()
+                    if not desc: desc = "ΦΩΝΗΤΙΚΗ ΚΑΤΑΧΩΡΗΣΗ"
+                    final_p = -price if st.session_state.return_mode else price
+                    st.session_state.cart.append({'bc': 'VOICE', 'name': desc, 'price': final_p})
+                    st.session_state.mic_key += 1; st.rerun()
+        
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"])
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
         if st.button("❌ Έξοδος"): st.session_state.logged_in = False; st.rerun()
 
+    # --- VIEW ROUTING ---
     if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"]:
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name} {'(ΕΠΙΣΤΡΟΦΗ)' if st.session_state.return_mode else ''}</div>", unsafe_allow_html=True)
         cl, cr = st.columns([1, 1.5])
@@ -190,8 +203,7 @@ else:
                 pr = st.number_input("Τιμή", min_value=0.0); stk = st.number_input("Stock", min_value=0, value=1)
                 if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ") and pl:
                     sku = f"{generate_latin_code(e)}-{generate_latin_code(p)}-{pl}-{generate_latin_code(c)}-{sz}".upper()
-                    full_name = f"{e} {c} ({sy})".upper()
-                    supabase.table("inventory").upsert({"barcode": sku, "name": full_name, "price": pr, "stock": stk}).execute()
+                    supabase.table("inventory").upsert({"barcode": sku, "name": f"{e} {c} ({sy})".upper(), "price": pr, "stock": stk}).execute()
                     st.success(f"Αποθηκεύτηκε: {sku}")
         with t2:
             cat = st.selectbox("Λίστα", ["Είδη", "Προμηθευτές", "Χρώματα", "Συνθέσεις"])
