@@ -6,3 +6,10 @@ streamlit
 supabase
 streamlit-mic-recorder
 plotly
+pandas
+streamlit
+supabase
+python-barcode
+Pillow
+plotly
+streamlit-mic-recorder
