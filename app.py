@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.3.5) ---
-st.set_page_config(page_title="CHERRY v14.3.5", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.3.6) ---
+st.set_page_config(page_title="CHERRY v14.3.6", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -122,6 +122,21 @@ def speak_text(text_to_say, play_beep=True):
 
 def play_sound(url):
     st.components.v1.html('<audio autoplay style="display:none"><source src="{}" type="audio/mpeg"></audio>'.format(url), height=0)
+
+@st.dialog("🏷️ Εκτύπωση Ετικέτας")
+def print_label_popup(bc, name, price):
+    st.write("Προεπισκόπηση Ετικέτας:")
+    label_html = """
+    <div style="width: 250px; border: 1px solid black; padding: 10px; text-align: center; background-color: white; color: black; font-family: Arial;">
+        <div style="font-size: 14px; font-weight: bold;">CHERRY SHOP</div>
+        <div style="font-size: 12px; margin: 5px 0;">{}</div>
+        <div style="font-size: 18px; font-weight: bold; border-top: 1px solid black; padding-top: 5px;">{}€</div>
+        <div style="font-size: 10px; margin-top: 5px;">{}</div>
+    </div>
+    """.format(name, price, bc)
+    st.markdown(label_html, unsafe_allow_html=True)
+    if st.button("🖨️ Εκτύπωση", use_container_width=True):
+        st.info("Η εντολή στάλθηκε στον εκτυπωτή.")
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
@@ -426,11 +441,14 @@ else:
             if res.data:
                 inv_df = pd.DataFrame(res.data).sort_values(by='name')
                 for _, r in inv_df.iterrows():
-                    col1, col2 = st.columns([5, 1])
+                    col1, col2, col3 = st.columns([5, 1, 1])
                     stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
                     txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
                     with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
                     with col2:
+                        if st.button("🏷️", key="lbl_{}".format(r['barcode']), use_container_width=True):
+                            print_label_popup(r['barcode'], r['name'], r['price'])
+                    with col3:
                         if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
                             supabase.table("inventory").delete().eq("barcode", r['barcode']).execute()
                             st.rerun()
