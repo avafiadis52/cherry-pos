@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.0) ---
-st.set_page_config(page_title="CHERRY v14.5.0", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.1) ---
+st.set_page_config(page_title="CHERRY v14.5.1", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -95,8 +95,13 @@ def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
 def generate_latin_code(text):
-    char_map = {'Α':'A','Β':'B','Γ':'G','Δ':'D','Ε':'E','Ζ':'Z','Η':'H','Θ':'TH','Ι':'I','Κ':'K','Λ':'L','Μ':'M','Ν':'N','Ξ':'X','Ο':'O','Π':'P','Ρ':'R','Σ':'S','Τ':'T','Υ':'Y','Φ':'F','Χ':'CH','Ψ':'PS','Ω':'O'}
-    return "".join([char_map.get(c, c) for c in str(text).upper()[:3]])
+    # Πλήρης χάρτης αντιστοίχισης για αποφυγή σφαλμάτων barcode
+    char_map = {
+        'Α':'A','Β':'B','Γ':'G','Δ':'D','Ε':'E','Ζ':'Z','Η':'H','Θ':'TH','Ι':'I','Κ':'K','Λ':'L','Μ':'M','Ν':'N','Ξ':'X','Ο':'O','Π':'P','Ρ':'R','Σ':'S','Τ':'T','Υ':'Y','Φ':'F','Χ':'CH','Ψ':'PS','Ω':'O',
+        'Ά':'A','Έ':'E','Ή':'H','Ί':'I','Ό':'O','Ύ':'Y','Ώ':'O','Ϊ':'I','Ϋ':'Y'
+    }
+    res = "".join([char_map.get(c, c) for c in str(text).upper()])
+    return res[:3]
 
 def reset_app():
     st.session_state.cart, st.session_state.selected_cust_id = [], None
@@ -132,23 +137,29 @@ def print_label_popup(bc, name, price):
     
     # --- ΠΑΡΑΓΩΓΗ ΕΙΚΟΝΑΣ BARCODE ΣΕ BASE64 ---
     try:
+        # Καθαρισμός του barcode από ελληνικά (double check)
+        char_map = {
+            'Α':'A','Β':'B','Γ':'G','Δ':'D','Ε':'E','Ζ':'Z','Η':'H','Θ':'TH','Ι':'I','Κ':'K','Λ':'L','Μ':'M','Ν':'N','Ξ':'X','Ο':'O','Π':'P','Ρ':'R','Σ':'S','Τ':'T','Υ':'Y','Φ':'F','Χ':'CH','Ψ':'PS','Ω':'O',
+            'Ά':'A','Έ':'E','Ή':'H','Ί':'I','Ό':'O','Ύ':'Y','Ώ':'O','Ϊ':'I','Ϋ':'Y'
+        }
+        clean_bc = "".join([char_map.get(c, c) for c in str(bc).upper()])
+        
         CODE128 = barcode.get_barcode_class('code128')
         writer_options = {"write_text": False, "module_height": 5.0}
-        my_barcode = CODE128(bc, writer=ImageWriter())
+        my_barcode = CODE128(clean_bc, writer=ImageWriter())
         
         buffer = io.BytesIO()
         my_barcode.write(buffer, options=writer_options)
         b64 = base64.b64encode(buffer.getvalue()).decode()
         barcode_img_html = f'<img src="data:image/png;base64,{b64}" style="width: 230px; height: 50px;">'
     except Exception as e:
-        barcode_img_html = f'<div style="color:red;">Σφάλμα Barcode: {e}</div>'
+        barcode_img_html = f'<div style="color:red; font-size:10px;">Σφάλμα Barcode: {e}</div>'
 
-    # Ανάλυση Barcode
+    # Ανάλυση Barcode για εμφάνιση
     parts = bc.split('-')
     prov_code = parts[1] if len(parts) > 1 else "---"
     design_code = parts[2] if len(parts) > 2 else "---"
     
-    # Απόσπαση σύνθεσης
     comp_match = re.search(r'\((.*?)\)', name)
     comp_text = comp_match.group(1) if comp_match else "---"
     clean_name = re.sub(r'\(.*?\)', '', name).strip()
