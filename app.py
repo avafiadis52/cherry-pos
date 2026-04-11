@@ -68,7 +68,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Session States
+# --- SESSION STATES ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
@@ -78,7 +78,15 @@ if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
-# --- 4. FUNCTIONS ---
+# Δυναμικές Λίστες Αποθήκης
+if 'list_eidov' not in st.session_state:
+    st.session_state.list_eidov = {"Ζακέτα":"ZAK", "Ζώνη":"ZON", "Μπλούζα":"MPL", "Μπουφάν / Παλτό":"MOU", "Παντελόνι":"PAN", "Πουκάμισο":"POU", "Φόρεμα":"FOR", "Φούστα":"FOU"}
+if 'list_prom' not in st.session_state:
+    st.session_state.list_prom = {"ONADO":"ONA", "PINUP":"PIN", "ΡΕΝΑ":"REN", "ΣΤΕΛΛΑ":"STE", "ΤΖΕΝΗ":"TZE"}
+if 'list_chroma' not in st.session_state:
+    st.session_state.list_chroma = {"Γκρι":"GRA", "Εκρού":"EKR", "Εμπριμέ":"EMP", "Καφέ":"KAF", "Κίτρινο":"YEL", "Κόκκινο":"RED", "Λευκό":"WHT", "Μαύρο":"BLK", "Μπεζ":"BEI", "Μπλε":"BLU", "Πουά":"PUA", "Πράσινο":"GRN", "Ριγέ":"RIG", "Σιέλ":"CIE"}
+
+# --- FUNCTIONS ---
 def get_athens_now():
     return datetime.now() + timedelta(hours=2)
 
@@ -88,6 +96,12 @@ def reset_app():
     st.session_state.return_mode = False
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
+
+def gen_code(text):
+    """Μετατροπή Ελληνικών σε Λατινικούς 3-ψήφιους κωδικούς (Greeklish)"""
+    trans = str.maketrans("ΑΒΓΔΕΖΗΘΙΚΛΜΞΟΠΡΣΤΥΦΧΨΩ", "ABGDEZHIKLMNXOPRSTYFXPS")
+    clean = text.upper().translate(trans)
+    return re.sub(r'[^A-Z0-9]', '', clean)[:3]
 
 def switch_to_normal():
     st.session_state.return_mode = False
@@ -332,112 +346,21 @@ else:
     elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
         
-        # --- ΔΥΝΑΜΙΚΕΣ ΛΙΣΤΕΣ ΜΕ ΕΠΙΛΟΓΗ "ΠΡΟΣΘΗΚΗ ΝΕΟΥ" ---
-        dict_eidos = {"Ζακέτα":"ZAK", "Ζώνη":"ZON", "Μπλούζα":"MPL", "Μπουφάν / Παλτό":"MOU", "Παντελόνι":"PAN", "Πουκάμισο":"POU", "Φόρεμα":"FOR", "Φούστα":"FOU", "➕ Προσθήκη Νέου...": "NEW"}
-        dict_prom = {"ONADO":"ONA", "PINUP":"PIN", "ΡΕΝΑ":"REN", "ΣΤΕΛΛΑ":"STE", "ΤΖΕΝΗ":"TZE", "➕ Προσθήκη Νέου...": "NEW"}
-        dict_chroma = {"Γκρι":"GRA", "Εκρού":"EKR", "Εμπριμέ":"EMP", "Καφέ":"KAF", "Κίτρινο":"YEL", "Κόκκινο":"RED", "Λευκό":"WHT", "Μαύρο":"BLK", "Μπεζ":"BEI", "Μπλε":"BLU", "Πουά":"PUA", "Πράσινο":"GRN", "Ριγέ":"RIG", "Σιέλ":"CIE", "➕ Προσθήκη Νέου...": "NEW"}
-        list_size = ["One Size", "S", "M", "L", "XL", "XXL"]
-        list_synth = ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι-30%Πολ", "98% Βαμβάκι-2%Ελ", "100% Δέρμα", "Τεχνητό Δέρμα(PU)", "Ελαστική", "➕ Προσθήκη Νέας Σύνθεσης..."]
-
         with st.expander("➕ ΚΑΤΑΧΩΡΗΣΗ ΝΕΟΥ ΠΡΟΪΟΝΤΟΣ", expanded=True):
             c1, c2, c3 = st.columns(3)
             
-            # 1. ΕΙΔΟΣ
-            sel_eidos_key = c1.selectbox("Είδος", sorted(dict_eidos.keys()))
-            if sel_eidos_key == "➕ Προσθήκη Νέου...":
-                val_eidos_name = c1.text_input("Όνομα Είδους")
-                val_eidos_code = c1.text_input("Κωδικός Είδους (3 γράμματα)", max_chars=3).upper()
+            # --- ΕΙΔΟΣ ---
+            opt_e = sorted(list(st.session_state.list_eidov.keys())) + ["+ Προσθήκη Νέου..."]
+            sel_e = c1.selectbox("Είδος", opt_e)
+            if sel_e == "+ Προσθήκη Νέου...":
+                new_e = c1.text_input("Όνομα Νέου Είδους")
+                if new_e: 
+                    st.session_state.list_eidov[new_e] = gen_code(new_e)
+                    sel_eidos, eidos_code = new_e, st.session_state.list_eidov[new_e]
+                else: sel_eidos, eidos_code = None, ""
             else:
-                val_eidos_name = sel_eidos_key
-                val_eidos_code = dict_eidos[sel_eidos_key]
+                sel_eidos, eidos_code = sel_e, st.session_state.list_eidov[sel_e]
 
-            # 2. ΠΡΟΜΗΘΕΥΤΗΣ
-            sel_prom_key = c2.selectbox("Προμηθευτής", sorted(dict_prom.keys()))
-            if sel_prom_key == "➕ Προσθήκη Νέου...":
-                val_prom_name = c2.text_input("Όνομα Προμηθευτή")
-                val_prom_code = c2.text_input("Κωδικός Προμηθ. (3 γράμματα)", max_chars=3).upper()
-            else:
-                val_prom_name = sel_prom_key
-                val_prom_code = dict_prom[sel_prom_key]
-
-            # 3. ΧΡΩΜΑ
-            sel_chroma_key = c3.selectbox("Χρώμα", sorted(dict_chroma.keys()))
-            if sel_chroma_key == "➕ Προσθήκη Νέου...":
-                val_chroma_name = c3.text_input("Όνομα Χρώματος")
-                val_chroma_code = c3.text_input("Κωδικός Χρώματος (3 γράμματα)", max_chars=3).upper()
-            else:
-                val_chroma_name = sel_chroma_key
-                val_chroma_code = dict_chroma[sel_chroma_key]
-
-            st.divider()
-            c4, c5, c6 = st.columns(3)
-            sel_size = c4.selectbox("Μέγεθος", list_size)
-            
-            # 4. ΣΥΝΘΕΣΗ
-            sel_synth_key = c5.selectbox("Σύνθεση", sorted(list_synth))
-            if sel_synth_key == "➕ Προσθήκη Νέας Σύνθεσης...":
-                val_synth = c5.text_input("Περιγραφή Σύνθεσης")
-            else:
-                val_synth = sel_synth_key
-            
-            design_id = c6.text_input("Κωδικός Σχεδίου (π.χ. 001)")
-
-            c7, c8, c9 = st.columns(3)
-            price = c7.number_input("Τιμή Λιανικής (€)", min_value=0.0, step=0.1)
-            stock = c8.number_input("Ποσότητα (Stock)", min_value=0, step=1)
-            
-            # ΠΑΡΑΓΩΓΗ SKU ΚΑΙ ΟΝΟΜΑΤΟΣ
-            if design_id and val_eidos_code and val_prom_code and val_chroma_code:
-                generated_sku = f"{val_eidos_code}-{val_prom_code}-{design_id}-{val_chroma_code}-{sel_size}".upper()
-                full_name = f"{val_eidos_name.upper()} - {val_chroma_name.upper()} ({val_synth})"
-                st.info(f"🏷️ **SKU:** {generated_sku} | **Όνομα:** {full_name}")
-            
-                if st.button("💾 Αποθήκευση Προϊόντος", use_container_width=True):
-                    try:
-                        supabase.table("inventory").upsert({
-                            "barcode": generated_sku, 
-                            "name": full_name, 
-                            "price": float(price), 
-                            "stock": int(stock)
-                        }).execute()
-                        st.success(f"Το προϊόν {generated_sku} αποθηκεύτηκε!")
-                        time.sleep(1); st.rerun()
-                    except Exception as e: st.error(f"Σφάλμα: {e}")
-
-        st.divider()
-        res = supabase.table("inventory").select("*").execute()
-        if res.data:
-            df_inv = pd.DataFrame(res.data).sort_values(by='name')
-            for _, r in df_inv.iterrows():
-                col1, col2 = st.columns([5, 1])
-                stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
-                txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
-                with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
-                with col2:
-                    if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
-                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
-        st.title("👥 Διαχείριση Πελατών")
-        res_c = supabase.table("customers").select("*").execute()
-        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
-        if res_c.data:
-            sales_data = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
-            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
-                pts = int(sales_data[sales_data['cust_id'] == r['id']]['final_item_price'].sum() // 10)
-                col1, col2, col3 = st.columns([5, 1, 1])
-                with col1: st.markdown("<div class='data-row'>👤 {} | 📞 {} | ⭐ {} pts</div>".format(r['name'], r['phone'], pts), unsafe_allow_html=True)
-                with col2:
-                    if st.button("⭐", key="pts_{}".format(r['id']), use_container_width=True): show_customer_history(r['id'], r['name'])
-                with col3:
-                    if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
-                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-
-    elif current_view == "⚙️ SYSTEM" and supabase:
-        st.title("⚙️ Ρυθμίσεις Συστήματος")
-        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
-            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
-            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
-                if st.button("ΕΚΤΕΛΕΣΗ"):
-                    supabase.table(target.lower()).delete().neq("id", -1).execute()
-                    st.success("Έγινε!"); time.sleep(1); st.rerun()
+            # --- ΠΡΟΜΗΘΕΥΤΗΣ ---
+            opt_p = sorted(list(st.session_state.list_prom.keys())) + ["+ Προσθήκη Νέου..."]
+            sel_p_ui = c2.
