@@ -5,6 +5,10 @@ import streamlit as st
 from supabase import create_client, Client
 import re
 import plotly.express as px
+import barcode
+from barcode.writer import ImageWriter
+import io
+import base64
 
 # --- 1. VOICE COMPONENT SETUP ---
 HAS_MIC = False
@@ -27,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.4.0) ---
-st.set_page_config(page_title="CHERRY v14.4.0", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.0) ---
+st.set_page_config(page_title="CHERRY v14.5.0", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -126,7 +130,20 @@ def play_sound(url):
 def print_label_popup(bc, name, price):
     st.write("Προεπισκόπηση Ετικέτας:")
     
-    # Ανάλυση Barcode (Μορφή: EID-PRO-SCHEDIO)
+    # --- ΠΑΡΑΓΩΓΗ ΕΙΚΟΝΑΣ BARCODE ΣΕ BASE64 ---
+    try:
+        CODE128 = barcode.get_barcode_class('code128')
+        writer_options = {"write_text": False, "module_height": 5.0}
+        my_barcode = CODE128(bc, writer=ImageWriter())
+        
+        buffer = io.BytesIO()
+        my_barcode.write(buffer, options=writer_options)
+        b64 = base64.b64encode(buffer.getvalue()).decode()
+        barcode_img_html = f'<img src="data:image/png;base64,{b64}" style="width: 230px; height: 50px;">'
+    except Exception as e:
+        barcode_img_html = f'<div style="color:red;">Σφάλμα Barcode: {e}</div>'
+
+    # Ανάλυση Barcode
     parts = bc.split('-')
     prov_code = parts[1] if len(parts) > 1 else "---"
     design_code = parts[2] if len(parts) > 2 else "---"
@@ -136,25 +153,38 @@ def print_label_popup(bc, name, price):
     comp_text = comp_match.group(1) if comp_match else "---"
     clean_name = re.sub(r'\(.*?\)', '', name).strip()
     
-    label_html = """
-    <div style="width: 280px; border: 2px solid black; padding: 15px; text-align: center; background-color: white; color: black; font-family: Arial;">
-        <div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">CHERRY</div>
-        <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">{}</div>
+    label_html = f"""
+    <div id="printable-label" style="width: 280px; border: 1px solid #ccc; padding: 15px; text-align: center; background-color: white; color: black; font-family: Arial;">
+        <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">CHERRY</div>
+        <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">{clean_name}</div>
         <div style="font-size: 9px; color: #333; margin-bottom: 5px;">
-            Προμ: {} | Σχέδιο: {}<br>
-            Σύνθεση: {}
+            Προμ: {prov_code} | Σχέδιο: {design_code}<br>
+            Σύνθεση: {comp_text}
         </div>
-        <div style="font-size: 24px; font-weight: bold; border-top: 1px solid black; border-bottom: 1px solid black; padding: 5px 0; margin: 5px 0;">{:.2f}€</div>
-        <div style="font-size: 13px; font-family: 'Courier New', monospace; font-weight: bold; letter-spacing: 2px; background: #f0f0f0; padding: 4px;">{}</div>
+        <div style="margin: 5px 0;">
+            {barcode_img_html}
+            <div style="font-size: 10px; font-family: monospace; font-weight: bold; letter-spacing: 1px;">{bc}</div>
+        </div>
+        <div style="font-size: 22px; font-weight: bold; border-top: 1px solid black; padding-top: 5px; margin-top: 5px;">{price:.2f}€</div>
     </div>
-    """.format(clean_name, prov_code, design_code, comp_text, price, bc)
+    """
     
     st.markdown(label_html, unsafe_allow_html=True)
     st.divider()
     qty = st.number_input("Πλήθος Ετικετών", min_value=1, max_value=50, value=1)
     
     if st.button("🖨️ ΕΚΤΥΠΩΣΗ ({} {})".format(qty, "ΑΝΤΙΤΥΠΟ" if qty==1 else "ΑΝΤΙΤΥΠΑ"), use_container_width=True):
-        st.success("Η εντολή για {} ετικέτες στάλθηκε στον εκτυπωτή.".format(qty))
+        st.components.v1.html(f"""
+            <script>
+                var win = window.open('', '', 'height=500,width=500');
+                win.document.write('<html><body style="margin:0; display:flex; justify-content:center; align-items:center;">');
+                win.document.write('{label_html.replace("border: 1px solid #ccc;", "border: none;")}');
+                win.document.write('</body></html>');
+                win.document.close();
+                win.print();
+            </script>
+        """, height=0)
+        st.success(f"Η εντολή για {qty} ετικέτες στάλθηκε.")
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
