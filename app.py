@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.3.6) ---
-st.set_page_config(page_title="CHERRY v14.3.6", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.3.7) ---
+st.set_page_config(page_title="CHERRY v14.3.7", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -78,7 +78,6 @@ if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
-# New Stock Module States
 if 'master_lists' not in st.session_state:
     st.session_state.master_lists = {
         "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
@@ -126,17 +125,27 @@ def play_sound(url):
 @st.dialog("🏷️ Εκτύπωση Ετικέτας")
 def print_label_popup(bc, name, price):
     st.write("Προεπισκόπηση Ετικέτας:")
+    # Απόσπαση σύνθεσης αν υπάρχει μέσα στην παρένθεση στο όνομα
+    comp_match = re.search(r'\((.*?)\)', name)
+    comp_text = comp_match.group(1) if comp_match else "---"
+    clean_name = re.sub(r'\(.*?\)', '', name).strip()
+    
     label_html = """
-    <div style="width: 250px; border: 1px solid black; padding: 10px; text-align: center; background-color: white; color: black; font-family: Arial;">
-        <div style="font-size: 14px; font-weight: bold;">CHERRY SHOP</div>
-        <div style="font-size: 12px; margin: 5px 0;">{}</div>
-        <div style="font-size: 18px; font-weight: bold; border-top: 1px solid black; padding-top: 5px;">{}€</div>
-        <div style="font-size: 10px; margin-top: 5px;">{}</div>
+    <div style="width: 280px; border: 2px solid black; padding: 15px; text-align: center; background-color: white; color: black; font-family: Arial;">
+        <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">CHERRY SHOP</div>
+        <div style="font-size: 11px; margin-bottom: 3px;">{}</div>
+        <div style="font-size: 10px; color: #555; margin-bottom: 8px;">Σύνθεση: {}</div>
+        <div style="font-size: 22px; font-weight: bold; border-top: 1px solid black; border-bottom: 1px solid black; padding: 5px 0; margin: 5px 0;">{:.2f}€</div>
+        <div style="font-size: 13px; font-family: 'Courier New', monospace; font-weight: bold; letter-spacing: 2px; background: #f0f0f0; padding: 4px;">{}</div>
     </div>
-    """.format(name, price, bc)
+    """.format(clean_name, comp_text, price, bc)
+    
     st.markdown(label_html, unsafe_allow_html=True)
-    if st.button("🖨️ Εκτύπωση", use_container_width=True):
-        st.info("Η εντολή στάλθηκε στον εκτυπωτή.")
+    st.divider()
+    qty = st.number_input("Πλήθος Ετικετών", min_value=1, max_value=50, value=1)
+    
+    if st.button("🖨️ ΕΚΤΥΠΩΣΗ ({} {})".format(qty, "ΑΝΤΙΤΥΠΟ" if qty==1 else "ΑΝΤΙΤΥΠΑ"), use_container_width=True):
+        st.success("Η εντολή για {} ετικέτες στάλθηκε στον εκτυπωτή.".format(qty))
 
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
