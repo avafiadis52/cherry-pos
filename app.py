@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.3.9) ---
-st.set_page_config(page_title="CHERRY v14.3.9", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.4.0) ---
+st.set_page_config(page_title="CHERRY v14.4.0", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -338,7 +338,7 @@ else:
                 df['ΠΕΛΑΤΗΣ'] = df['cust_id'].map(cust_dict).fillna("Λιανική")
                 df['s_date_dt'] = pd.to_datetime(df['s_date'])
                 df['ΗΜΕΡΟΜΗΝΙΑ'] = df['s_date_dt'].dt.date
-                df = df.sort_values(['ΗΜΕΡΟΜΗALΗ', 's_date_dt'])
+                df = df.sort_values(['ΗΜΕΡΟΜΗΝΙΑ', 's_date_dt'])
                 df['ΠΡΑΞΗ'] = df.groupby('ΗΜΕΡΟΜΗΝΙΑ')['s_date'].transform(lambda x: pd.factorize(x)[0] + 1)
                 today_date = st.session_state.get('manual_ts', get_athens_now()).date()
                 
