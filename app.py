@@ -479,8 +479,9 @@ else:
                 if new_val and new_val not in st.session_state.master_lists[cat]:
                     st.session_state.master_lists[cat].append(new_val)
                     st.success("Προστέθηκε!")
-                    time.sleep(0.5); st.rerun() # Ανανέωση για να αποθηκευτεί στη μνήμη του session
-            st.write("Τρέχουσες τιμές:", ", ".join(st.session_state.master_lists[cat]))
+                    time.sleep(0.5); st.rerun()
+            # Η αλλαγή έγινε εδώ: χρησιμοποιείται η sorted() για την εμφάνιση
+            st.write("Τρέχουσες τιμές:", ", ".join(sorted(st.session_state.master_lists[cat])))
 
         with tab_list:
             st.subheader("Τρέχον Απόθεμα")
