@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.1) ---
-st.set_page_config(page_title="CHERRY v14.5.1", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.2) ---
+st.set_page_config(page_title="CHERRY v14.5.2", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -271,7 +271,7 @@ else:
     # --- 6. MAIN UI ---
     with st.sidebar:
         current_athens = get_athens_now()
-        chosen_date = st.date_input("Ημερομηνία", value=current_athens.date(), format="DD/MM/YYYY")
+        chosen_date = st.date_input("Ημερομηνία", value=current_athens.date())
         chosen_time = st.time_input("Ώρα", value=current_athens.time())
         st.session_state.manual_ts = datetime.combine(chosen_date, chosen_time)
         st.markdown("<div class='sidebar-date'>{}</div>".format(st.session_state.manual_ts.strftime('%d/%m/%Y %H:%M:%S')), unsafe_allow_html=True)
@@ -345,12 +345,14 @@ else:
         tab_new, tab_settings, tab_list = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ", "📋 ΑΠΟΘΕΜΑ"])
         with tab_new:
             with st.form("inventory_form", clear_on_submit=True):
-                f_item = st.selectbox("Είδος", sorted(st.session_state.master_lists["Είδη"]))
-                f_prov = st.selectbox("Προμηθευτής", sorted(st.session_state.master_lists["Προμηθευτές"]))
-                f_color = st.selectbox("Χρώμα", sorted(st.session_state.master_lists["Χρώματα"]))
-                f_design = st.text_input("Σχέδιο")
-                f_comp = st.selectbox("Σύνθεση", sorted(st.session_state.master_lists["Συνθέσεις"]))
-                f_price = st.number_input("Τιμή", min_value=0.0)
+                c1, c2, c3 = st.columns(3)
+                f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists["Είδη"]))
+                f_prov = c2.selectbox("Προμηθευτής", sorted(st.session_state.master_lists["Προμηθευτές"]))
+                f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists["Χρώματα"]))
+                c4, c5, c6 = st.columns(3)
+                f_design = c4.text_input("Σχέδιο")
+                f_comp = c5.selectbox("Σύνθεση", sorted(st.session_state.master_lists["Συνθέσεις"]))
+                f_price = c6.number_input("Τιμή", min_value=0.0)
                 f_stock = st.number_input("Απόθεμα", min_value=0, value=1)
                 if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ"):
                     sku = "{}-{}-{}".format(generate_latin_code(f_item), generate_latin_code(f_prov), f_design.upper())
@@ -368,7 +370,16 @@ else:
             res = supabase.table("inventory").select("*").execute()
             if res.data:
                 inv_df = pd.DataFrame(res.data).sort_values('name')
-                st.dataframe(inv_df, use_container_width=True)
+                for _, r in inv_df.iterrows():
+                    col1, col2, col3 = st.columns([5, 1, 1])
+                    stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
+                    txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
+                    with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
+                    with col2: 
+                        if st.button("🏷️", key=f"lbl_{r['barcode']}"): print_label_popup(r['barcode'], r['name'], r['price'])
+                    with col3:
+                        if st.button("❌", key=f"del_{r['barcode']}"): 
+                            supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
 
     elif view == "👥 ΠΕΛΑΤΕΣ":
         st.title("👥 Πελάτες")
@@ -382,5 +393,5 @@ else:
 
     elif view == "⚙️ SYSTEM":
         st.title("⚙️ System Settings")
-        st.info("Έκδοση Λογισμικού: v14.5.1")
+        st.info("Έκδοση Λογισμικού: v14.5.2")
         if st.button("Clear Cache"): st.cache_resource.clear(); st.success("Cleared!")
