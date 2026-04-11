@@ -26,7 +26,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.2.98", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.3.1", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -43,15 +43,10 @@ st.markdown("""
     div.stButton > button { background-color: #d3d3d3 !important; color: #000 !important; font-weight: bold !important; border-radius: 8px !important; }
     .data-row { font-family: 'Courier New', monospace; background-color: #262626; padding: 12px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; display: block; white-space: pre; font-size: 14px; }
     .sidebar-date { color: #f1c40f; font-size: 18px; font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-    .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
-    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
-    
-    /* Label Styles */
-    .label-box { border: 2px dashed #333; padding: 10px; background: white; color: black; font-family: 'Courier New', monospace; width: 300px; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. SESSION STATE & MASTER LISTS ---
+# --- 4. SESSION STATE ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
@@ -66,7 +61,7 @@ if 'master_lists' not in st.session_state:
         "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
         "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
         "Χρώματα": ["Γκρι", "Εκρού", "Εμπριμέ", "Καφέ", "Κίτρινο", "Κόκκινο", "Λευκό", "Μαύρο", "Μπεζ", "Μπλε", "Πουά", "Πράσινο", "Ριγέ", "Σιέλ"],
-        "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)", "Ελαστική"]
+        "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
     }
 
 # --- 5. HELPERS ---
@@ -82,6 +77,25 @@ def reset_app():
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1; st.rerun()
 
 # --- 6. DIALOGS ---
+@st.dialog("🏷️ ΕΚΤΥΠΩΣΗ ΕΤΙΚΕΤΩΝ")
+def print_label_popup(name, barcode, price):
+    st.markdown(f"""
+    <div style="background:white; color:black; padding:15px; border:3px solid black; font-family:'Courier New', monospace; text-align:center; margin-bottom:15px;">
+        <h2 style="margin:0;">CHERRY</h2>
+        <hr style="border-top:1px solid black;">
+        <p style="font-size:16px; margin:5px 0;"><b>{name}</b></p>
+        <p style="font-size:14px; margin:2px 0;">CODE: {barcode}</p>
+        <h1 style="margin:10px 0;">{price:.2f} €</h1>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    copies = st.number_input("Ποσότητα ετικετών για εκτύπωση", min_value=1, max_value=100, value=1)
+    
+    if st.button(f"🖨️ ΕΚΤΥΠΩΣΗ ({copies})", use_container_width=True):
+        st.success(f"Εκτυπώθηκαν {copies} ετικέτες για το είδος {barcode}!")
+        time.sleep(1)
+        st.rerun()
+
 @st.dialog("👤 Νέος Πελάτης")
 def new_customer_popup(phone):
     st.write(f"Το τηλέφωνο **{phone}** είναι νέο.")
@@ -120,20 +134,7 @@ def payment_popup():
     if c1.button("💵 Μετρητά", use_container_width=True): finalize(disc, "Μετρητά")
     if c2.button("💳 Κάρτα", use_container_width=True): finalize(disc, "Κάρτα")
 
-@st.dialog("🏷️ Εκτύπωση Ετικέτας")
-def print_label_popup(r):
-    st.markdown(f"""
-    <div style="background:white; color:black; padding:20px; border:2px solid black; font-family:monospace; text-align:center;">
-        <h2 style="margin:0;">CHERRY</h2>
-        <hr style="border-top:1px solid black;">
-        <p style="font-size:18px; margin:5px 0;"><b>{r['name']}</b></p>
-        <p style="font-size:16px; margin:5px 0;">BC: {r['barcode']}</p>
-        <h1 style="margin:10px 0;">{r['price']:.2f} €</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("ΕΚΤΥΠΩΣΗ (Προσομοίωση)"): st.toast("Η ετικέτα στάλθηκε στον εκτυπωτή!")
-
-# --- 7. MAIN LOGIC ---
+# --- 7. MAIN INTERFACE ---
 if not st.session_state.logged_in:
     c2 = st.columns([1,1,1])[1]
     with c2:
@@ -146,21 +147,11 @@ else:
         chosen_date = st.date_input("Ημερομηνία", value=ts_now.date())
         chosen_time = st.time_input("Ώρα", value=ts_now.time())
         st.session_state.manual_ts = datetime.combine(chosen_date, chosen_time)
-        st.markdown(f"<div class='sidebar-date'>{st.session_state.manual_ts.strftime('%d/%m/%Y %H:%M')}</div>", unsafe_allow_html=True)
-        if HAS_MIC:
-            voice = speech_to_text(language='el', start_prompt="🎙️ ΦΩΝΗΤΙΚΗ ΠΩΛΗΣΗ", key=f"mic_{st.session_state.mic_key}")
-            if voice:
-                nums = re.findall(r"\d+", voice)
-                if nums:
-                    p = float(nums[0])
-                    st.session_state.cart.append({'bc': 'VOICE', 'name': voice.upper(), 'price': -p if st.session_state.return_mode else p})
-                    st.session_state.mic_key += 1; st.rerun()
         st.divider()
         view = st.radio("Μενού", ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ", "📊 MANAGER", "📦 ΑΠΟΘΗΚΗ", "👥 ΠΕΛΑΤΕΣ", "⚙️ SYSTEM"])
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
         if st.button("❌ Έξοδος"): st.session_state.logged_in = False; st.rerun()
 
-    # --- VIEW ROUTING ---
     if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"]:
         st.markdown(f"<div class='status-header'>Πελάτης: {st.session_state.cust_name} {'(ΕΠΙΣΤΡΟΦΗ)' if st.session_state.return_mode else ''}</div>", unsafe_allow_html=True)
         cl, cr = st.columns([1, 1.5])
@@ -199,8 +190,9 @@ else:
                 pr = st.number_input("Τιμή", min_value=0.0); stk = st.number_input("Stock", min_value=0, value=1)
                 if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ") and pl:
                     sku = f"{generate_latin_code(e)}-{generate_latin_code(p)}-{pl}-{generate_latin_code(c)}-{sz}".upper()
-                    supabase.table("inventory").upsert({"barcode": sku, "name": f"{e} {c} ({sy})".upper(), "price": pr, "stock": stk}).execute()
-                    st.success(f"OK: {sku}"); time.sleep(1); st.rerun()
+                    full_name = f"{e} {c} ({sy})".upper()
+                    supabase.table("inventory").upsert({"barcode": sku, "name": full_name, "price": pr, "stock": stk}).execute()
+                    st.success(f"Αποθηκεύτηκε: {sku}")
         with t2:
             cat = st.selectbox("Λίστα", ["Είδη", "Προμηθευτές", "Χρώματα", "Συνθέσεις"])
             for item in sorted(st.session_state.master_lists[cat]):
@@ -216,8 +208,10 @@ else:
                     c1, c2, c3 = st.columns([5,1,1])
                     stk_color = "#2ecc71" if r['stock'] > 0 else "#e74c3c"
                     c1.markdown(f"<div class='data-row'>📦 {r['barcode']} | {r['name']} | {r['price']}€ | Stock: <span style='color:{stk_color}'>{r['stock']}</span></div>", unsafe_allow_html=True)
-                    if c2.button("🏷️", key=f"pr_{r['barcode']}"): print_label_popup(r)
-                    if c3.button("❌", key=f"del_{r['barcode']}"): supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
+                    if c2.button("🏷️", key=f"pr_{r['barcode']}"):
+                        print_label_popup(r['name'], r['barcode'], r['price'])
+                    if c3.button("❌", key=f"del_{r['barcode']}"): 
+                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
 
     elif view == "📊 MANAGER":
         st.title("📊 Αναφορές")
@@ -230,7 +224,7 @@ else:
                 tab1, tab2, tab3 = st.tabs(["📅 ΣΗΜΕΡΑ", "📆 ΠΕΡΙΟΔΟΣ", "📈 INSIGHTS"])
                 with tab1:
                     tdf = df[df['ΗΜΕΡΟΜΗΝΙΑ'] == today]
-                    st.markdown(f"<div class='report-stat'><div class='stat-val'>{tdf['final_item_price'].sum():.2f}€</div><div>Τζίρος Ημέρας</div></div>", unsafe_allow_html=True)
+                    st.metric("Τζίρος Ημέρας", f"{tdf['final_item_price'].sum():.2f}€")
                     st.dataframe(tdf, use_container_width=True)
                 with tab2:
                     start = st.date_input("Από", today - timedelta(days=7)); end = st.date_input("Έως", today)
