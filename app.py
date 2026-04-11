@@ -41,8 +41,8 @@ def generate_latin_code(text):
         res += char_map.get(char, char)
     return res
 
-# --- 3. CONFIG & STYLE (Version v14.2.73) ---
-st.set_page_config(page_title="CHERRY v14.2.73", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.74) ---
+st.set_page_config(page_title="CHERRY v14.2.74", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -246,7 +246,7 @@ else:
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
         current_view = view if view != "🔄 ΕΠΙΣΤΡΟΦΗ" else "🛒 ΤΑΜΕΙΟ"
         
-        if st.button("❌ Έξοδος / Κλείδωμα", use_container_width=True): 
+        if st.button("❌ Έξοδος / Κλείδωμα", key="logout_btn", use_container_width=True): 
             st.session_state.logged_in = False
             st.session_state.cart = []
             st.rerun()
@@ -297,7 +297,7 @@ else:
 
     elif current_view == "📊 MANAGER" and supabase:
         st.title("📊 Αναφορές")
-        if st.text_input("Κωδικός MANAGER", type="password") == "999":
+        if st.text_input("Κωδικός MANAGER", type="password", key="mgr_pwd") == "999":
             res_s = supabase.table("sales").select("*").execute()
             res_c = supabase.table("customers").select("id, name").execute()
             if res_s.data:
@@ -346,75 +346,8 @@ else:
     elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
         st.title("📦 Διαχείριση Αποθήκης")
         
-        # --- Δυναμικές Λίστες με Προσθήκη Νέου ---
         list_eidov = {"Ζακέτα":"ZAK", "Ζώνη":"ZON", "Μπλούζα":"MPL", "Μπουφάν / Παλτό":"MOU", "Παντελόνι":"PAN", "Πουκάμισο":"POU", "Φόρεμα":"FOR", "Φούστα":"FOU"}
         list_prom = {"ONADO":"ONA", "PINUP":"PIN", "ΡΕΝΑ":"REN", "ΣΤΕΛΛΑ":"STE", "ΤΖΕΝΗ":"TZE"}
         list_chroma = {"Γκρι":"GRA", "Εκρού":"EKR", "Εμπριμέ":"EMP", "Καφέ":"KAF", "Κίτρινο":"YEL", "Κόκκινο":"RED", "Λευκό":"WHT", "Μαύρο":"BLK", "Μπεζ":"BEI", "Μπλε":"BLU", "Πουά":"PUA", "Πράσινο":"GRN", "Ριγέ":"RIG", "Σιέλ":"CIE"}
         list_size = ["One Size", "S", "M", "L", "XL", "XXL", "➕ Προσθήκη Νέου..."]
-        base_synth = ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)", "Ελαστική", "➕ Προσθήκη Νέου..."]
-
-        # Initialization logic (Resetting fields)
-        if 'inv_reset_key' not in st.session_state: st.session_state.inv_reset_key = 0
-
-        with st.expander("➕ ΚΑΤΑΧΩΡΗΣΗ ΝΕΟΥ ΠΡΟΪΟΝΤΟΣ", expanded=True):
-            rk = st.session_state.inv_reset_key
-            c1, c2, c3 = st.columns(3)
-            
-            # ΕΙΔΟΣ
-            eidos_opts = sorted(list(list_eidov.keys())) + ["➕ Προσθήκη Νέου..."]
-            sel_eidos = c1.selectbox("Είδος", eidos_opts, key=f"eidos_{rk}")
-            if sel_eidos == "➕ Προσθήκη Νέου...":
-                new_e = c1.text_input("Νέο Είδος", placeholder="π.χ. Κολάν", key=f"new_e_{rk}")
-                final_eidos = new_e.strip() if new_e else ""
-                final_eidos_code = generate_latin_code(final_eidos) if final_eidos else "NEW"
-            else:
-                final_eidos = sel_eidos
-                final_eidos_code = list_eidov[sel_eidos] if sel_eidos else "INV"
-
-            # ΠΡΟΜΗΘΕΥΤΗΣ
-            prom_opts = sorted(list(list_prom.keys())) + ["➕ Προσθήκη Νέου..."]
-            sel_prom = c2.selectbox("Προμηθευτής", prom_opts, key=f"prom_{rk}")
-            if sel_prom == "➕ Προσθήκη Νέου...":
-                new_p = c2.text_input("Νέος Προμηθευτής", key=f"new_p_{rk}")
-                final_prom = new_p.strip() if new_p else ""
-                final_prom_code = generate_latin_code(final_prom) if final_prom else "NEW"
-            else:
-                final_prom = sel_prom
-                final_prom_code = list_prom[sel_prom] if sel_prom else "PRM"
-
-            # ΧΡΩΜΑ
-            chroma_opts = sorted(list(list_chroma.keys())) + ["➕ Προσθήκη Νέου..."]
-            sel_chroma = c3.selectbox("Χρώμα", chroma_opts, key=f"chroma_{rk}")
-            if sel_chroma == "➕ Προσθήκη Νέου...":
-                new_c = c3.text_input("Νέο Χρώμα", key=f"new_c_{rk}")
-                final_chroma = new_c.strip() if new_c else ""
-                final_chroma_code = generate_latin_code(final_chroma) if final_chroma else "NEW"
-            else:
-                final_chroma = sel_chroma
-                final_chroma_code = list_chroma[sel_chroma] if sel_chroma else "COL"
-            
-            c4, c5, c6 = st.columns(3)
-            
-            # ΜΕΓΕΘΟΣ
-            sel_size = c4.selectbox("Μέγεθος", list_size, key=f"size_{rk}")
-            final_size = c4.text_input("Νέο Μέγεθος", key=f"new_sz_{rk}") if sel_size == "➕ Προσθήκη Νέου..." else sel_size
-            
-            # ΣΥΝΘΕΣΗ
-            chosen_synth = c5.selectbox("Σύνθεση", sorted(base_synth), key=f"synth_{rk}")
-            final_synth = c5.text_input("Γράψτε τη νέα σύνθεση", key=f"new_sy_{rk}") if chosen_synth == "➕ Προσθήκη Νέου..." else chosen_synth
-                
-            design_id = c6.text_input("Κωδικός Σχεδίου", placeholder="π.χ. 001", key=f"design_{rk}")
-            
-            c7, c8, c9 = st.columns(3)
-            price = c7.number_input("Τιμή Λιανικής (€)", min_value=0.0, step=0.1, key=f"price_{rk}")
-            stock = c8.number_input("Ποσότητα (Stock)", min_value=0, step=1, key=f"stock_{rk}")
-            label_count = c9.number_input("Ετικέτες προς εκτύπωση", min_value=0, value=stock, key=f"label_{rk}")
-            
-            generated_sku = ""
-            full_name = ""
-            if design_id and final_eidos:
-                generated_sku = f"{final_eidos_code}-{final_prom_code}-{design_id}-{final_chroma_code}-{final_size}".upper()
-                full_name = f"{final_eidos.upper()} - {final_chroma.upper()} ({final_synth})"
-                st.info(f"🏷️ **SKU:** {generated_sku} | **Όνομα:** {full_name}")
-            
-            if st.button("
+        base_synth = ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό
