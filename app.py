@@ -78,7 +78,7 @@ if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
-# Dynamic Lists for Inventory
+# Dynamic Lists for Inventory (Persistent through Rerun)
 if 'list_eidov' not in st.session_state:
     st.session_state.list_eidov = {"Ζακέτα":"ZAK", "Ζώνη":"ZON", "Μπλούζα":"MPL", "Μπουφάν / Παλτό":"MOU", "Παντελόνι":"PAN", "Πουκάμισο":"POU", "Φόρεμα":"FOR", "Φούστα":"FOU"}
 if 'list_prom' not in st.session_state:
@@ -98,10 +98,11 @@ def reset_app():
     st.rerun()
 
 def gen_code(text):
-    """Convert Greek to Latin 3-char code (Greeklish)"""
+    """Convert Greek to Latin 3-char code (Greeklish shorthand)"""
     trans = str.maketrans("ΑΒΓΔΕΖΗΘΙΚΛΜΞΟΠΡΣΤΥΦΧΨΩ", "ABGDEZHIKLMNXOPRSTYFXPS")
     clean = text.upper().translate(trans)
-    return re.sub(r'[^A-Z0-9]', '', clean)[:3]
+    clean = re.sub(r'[^A-Z0-9]', '', clean)
+    return clean[:3] if len(clean) >= 3 else (clean + "XXX")[:3]
 
 def switch_to_normal():
     st.session_state.return_mode = False
@@ -331,4 +332,29 @@ else:
                         st.markdown(f"<div class='report-stat' style='border: 2px solid #3498db;'><div style='color:#3498db; font-weight:bold;'>ΣΥΝΟΛΙΚΟΣ ΤΖΙΡΟΣ ΠΕΡΙΟΔΟΥ</div><div class='stat-val' style='font-size:40px;'>{p_df['final_item_price'].sum():.2f}€</div></div>", unsafe_allow_html=True)
                         for d_day in sorted(p_df['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True):
                             d_df = p_df[p_df['ΗΜΕΡΟΜΗΝΙΑ'] == d_day].copy()
-                            st.markdown(f"<div class='day-header'>📅 {d_day.strftime('%d/%m/%Y')} | Σύνολο: {
+                            st.markdown(f"<div class='day-header'>📅 {d_day.strftime('%d/%m/%Y')} | Σύνολο: {d_df['final_item_price'].sum():.2f}€</div>", unsafe_allow_html=True)
+                            st.dataframe(d_df[['ΠΡΑΞΗ', 's_date', 'item_name', 'unit_price', 'final_item_price', 'method', 'ΠΕΛΑΤΗΣ']].sort_values('s_date', ascending=False), use_container_width=True, hide_index=True)
+
+                with t3:
+                    st.subheader("📈 Ανάλυση Δεδομένων")
+                    ix1, ix2 = st.columns(2)
+                    i_sd = ix1.date_input("Από", today_date-timedelta(days=30), key="ins_start")
+                    i_ed = ix2.date_input("Έως", today_date, key="ins_end")
+                    idf = df[(df['ΗΜΕΡΟΜΗΝΙΑ'] >= i_sd) & (df['ΗΜΕΡΟΜΗΝΙΑ'] <= i_ed)].copy()
+                    if not idf.empty:
+                        st.plotly_chart(px.bar(idf.groupby('item_name')['final_item_price'].sum().nlargest(10).reset_index(), x='final_item_price', y='item_name', orientation='h', title="Top 10 Προϊόντα (€)"), use_container_width=True)
+
+    elif current_view == "📦 ΑΠΟΘΗΚΗ" and supabase:
+        st.title("📦 Διαχείριση Αποθήκης")
+        
+        with st.expander("➕ ΚΑΤΑΧΩΡΗΣΗ ΝΕΟΥ ΠΡΟΪΟΝΤΟΣ", expanded=True):
+            c1, c2, c3 = st.columns(3)
+            
+            # --- EIDOS ---
+            opt_e = sorted(list(st.session_state.list_eidov.keys())) + ["+ Προσθήκη Νέου..."]
+            sel_e = c1.selectbox("Είδος", opt_e)
+            if sel_e == "+ Προσθήκη Νέου...":
+                new_e = c1.text_input("Όνομα Νέου Είδους", placeholder="π.χ. Κολάν")
+                if new_e: 
+                    st.session_state.list_eidov[new_e] = gen_code(new_e)
+                    sel_eidos, eidos_code = new_e, st.session_state.list_eidov
