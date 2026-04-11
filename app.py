@@ -26,7 +26,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # --- 3. CONFIG & STYLE ---
-st.set_page_config(page_title="CHERRY v14.3.9", layout="wide", page_icon="🍒")
+st.set_page_config(page_title="CHERRY v14.3.10", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -49,7 +49,6 @@ st.markdown("""
     
     .data-row { font-family: 'Courier New', monospace; background-color: #262626; padding: 12px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #3498db; display: block; white-space: pre; }
     .report-stat { background-color: #262730; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; margin-bottom: 10px; }
-    .stat-val { font-size: 24px; font-weight: bold; color: #2ecc71; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -84,13 +83,7 @@ def reset_app():
     st.session_state.bc_key += 1; st.session_state.ph_key += 1; st.session_state.mic_key += 1
     st.rerun()
 
-@st.dialog("🏷️ ΕΚΤΥΠΩΣΗ ΕΤΙΚΕΤΩΝ")
-def print_label_popup(name, barcode, price):
-    st.markdown(f"<div style='background:white; color:black; padding:15px; border:3px solid black; text-align:center;'><h2>CHERRY</h2><hr><b>{name}</b><br>CODE: {barcode}<h1>{price:.2f} €</h1></div>", unsafe_allow_html=True)
-    if st.button("🖨️ ΕΚΤΥΠΩΣΗ"):
-        st.success("Εκτύπωση επιτυχής!"); time.sleep(1); st.rerun()
-
-# --- 6. CORE LOGIC (Finalize, Payment etc) ---
+# --- 6. CORE LOGIC ---
 def finalize(disc_val, method):
     sub = sum(i['price'] for i in st.session_state.cart)
     ratio = disc_val / sub if sub > 0 else 0
@@ -123,11 +116,14 @@ def payment_popup():
 
 # --- 7. MAIN UI ---
 if not st.session_state.logged_in:
-    c2 = st.columns([1,1,1])[1]
+    c1, c2, c3 = st.columns([1,1,1])
     with c2:
         st.title("🔒 LOGIN")
-        if st.text_input("Password", type="password") == "CHERRY123" and st.button("Είσοδος"):
-            st.session_state.logged_in = True; st.rerun()
+        pwd = st.text_input("Password", type="password")
+        if st.button("Είσοδος"):
+            if pwd == "CHERRY123":
+                st.session_state.logged_in = True; st.rerun()
+            else: st.error("Λάθος κωδικός")
 else:
     with st.sidebar:
         now = get_athens_now()
@@ -151,7 +147,6 @@ else:
         st.session_state.return_mode = (view == "🔄 ΕΠΙΣΤΡΟΦΗ")
         if st.button("❌ Έξοδος"): st.session_state.logged_in = False; st.rerun()
 
-    # --- VIEW ROUTING ---
     if view in ["🛒 ΤΑΜΕΙΟ", "🔄 ΕΠΙΣΤΡΟΦΗ"]:
         cl, cr = st.columns([1, 1.5])
         with cl:
@@ -159,7 +154,62 @@ else:
                 ph = st.text_input("Τηλέφωνο", key=f"ph_{st.session_state.ph_key}")
                 if len(ph) == 10:
                     res = supabase.table("customers").select("*").eq("phone", ph).execute()
-                    if res.data: st.session_state.selected_cust_id, st.session_state.cust_name = res.data[0]['id'], res.data[0]['name']; st.rerun()
-                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): st.session_state.selected_cust_id = 0; st.rerun()
+                    if res.data: 
+                        st.session_state.selected_cust_id = res.data[0]['id']
+                        st.session_state.cust_name = res.data[0]['name']
+                        st.rerun()
+                if st.button("🛒 ΛΙΑΝΙΚΗ ΠΩΛΗΣΗ", use_container_width=True): 
+                    st.session_state.selected_cust_id = 0; st.rerun()
             else:
-                st.button(f"👤 {st.session_
+                # Εδώ ήταν το σφάλμα - Διορθώθηκε
+                st.button(f"👤 {st.session_state.cust_name} (Αλλαγή)", on_click=lambda: st.session_state.update({"selected_cust_id": None, "cust_name": "Λιανική Πώληση"}))
+                
+                bc = st.text_input("Barcode", key=f"bc_{st.session_state.bc_key}")
+                if bc:
+                    res = supabase.table("inventory").select("*").eq("barcode", bc).execute()
+                    if res.data:
+                        val = -float(res.data[0]['price']) if st.session_state.return_mode else float(res.data[0]['price'])
+                        st.session_state.cart.append({'bc': bc, 'name': res.data[0]['name'], 'price': val})
+                        st.session_state.bc_key += 1; st.rerun()
+                
+                for idx, i in enumerate(st.session_state.cart):
+                    if st.button(f"❌ {i['name']} {i['price']}€", key=f"del_{idx}_{i['bc']}", use_container_width=True): 
+                        st.session_state.cart.pop(idx); st.rerun()
+                
+                if st.session_state.cart and st.button("💰 ΠΛΗΡΩΜΗ", use_container_width=True): payment_popup()
+                if st.button("🔄 ΑΚΥΡΩΣΗ", use_container_width=True): reset_app()
+        
+        with cr:
+            total = sum(i['price'] for i in st.session_state.cart)
+            lines = [f"{i['name'][:40]:40} | {i['price']:>6.2f}€" for i in st.session_state.cart]
+            st.markdown(f"<div class='cart-area'>{'Είδος':40} | {'Τιμή':>7}\n{'-'*50}\n" + "\n".join(lines) + "</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='total-label'>{total:.2f}€</div>", unsafe_allow_html=True)
+
+    elif view == "📦 ΑΠΟΘΗΚΗ":
+        st.title("📦 ΑΠΟΘΗΚΗ")
+        tab1, tab2, tab3 = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ", "📋 ΑΠΟΘΕΜΑ"])
+        
+        with tab1:
+            with st.form("inv_form", clear_on_submit=True):
+                c1,c2,c3 = st.columns(3)
+                e = c1.selectbox("Είδος", sorted(st.session_state.master_lists["Είδη"]))
+                p = c2.selectbox("Προμηθευτής", sorted(st.session_state.master_lists["Προμηθευτές"]))
+                c = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists["Χρώματα"]))
+                pl = st.text_input("Σχέδιο")
+                pr = st.number_input("Τιμή Πώλησης (€)", min_value=0.0)
+                stk = st.number_input("Απόθεμα", min_value=0, value=1)
+                if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ"):
+                    sku = f"{generate_latin_code(e)}-{generate_latin_code(p)}-{pl}".upper()
+                    supabase.table("inventory").upsert({"barcode": sku, "name": f"{e} {c}".upper(), "price": pr, "stock": stk}).execute()
+                    st.success(f"Καταχωρήθηκε: {sku}")
+
+        with tab3:
+            res = supabase.table("inventory").select("*").execute()
+            if res.data:
+                for r in res.data:
+                    st.markdown(f"<div class='data-row'>📦 {r['barcode']} | {r['name']} | {r['price']}€ | Stock: {r['stock']}</div>", unsafe_allow_html=True)
+
+    elif view == "📊 MANAGER":
+        st.title("📊 MANAGER")
+        res = supabase.table("sales").select("*").execute()
+        if res.data: st.dataframe(pd.DataFrame(res.data))
