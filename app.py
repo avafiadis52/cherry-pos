@@ -41,8 +41,8 @@ def generate_latin_code(text):
         res += char_map.get(char, char)
     return res
 
-# --- 3. CONFIG & STYLE (Version v14.2.72) ---
-st.set_page_config(page_title="CHERRY v14.2.72", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.2.73) ---
+st.set_page_config(page_title="CHERRY v14.2.73", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -353,112 +353,68 @@ else:
         list_size = ["One Size", "S", "M", "L", "XL", "XXL", "➕ Προσθήκη Νέου..."]
         base_synth = ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)", "Ελαστική", "➕ Προσθήκη Νέου..."]
 
+        # Initialization logic (Resetting fields)
+        if 'inv_reset_key' not in st.session_state: st.session_state.inv_reset_key = 0
+
         with st.expander("➕ ΚΑΤΑΧΩΡΗΣΗ ΝΕΟΥ ΠΡΟΪΟΝΤΟΣ", expanded=True):
+            rk = st.session_state.inv_reset_key
             c1, c2, c3 = st.columns(3)
             
             # ΕΙΔΟΣ
             eidos_opts = sorted(list(list_eidov.keys())) + ["➕ Προσθήκη Νέου..."]
-            sel_eidos = c1.selectbox("Είδος", eidos_opts)
+            sel_eidos = c1.selectbox("Είδος", eidos_opts, key=f"eidos_{rk}")
             if sel_eidos == "➕ Προσθήκη Νέου...":
-                new_e = c1.text_input("Νέο Είδος", placeholder="π.χ. Κολάν")
+                new_e = c1.text_input("Νέο Είδος", placeholder="π.χ. Κολάν", key=f"new_e_{rk}")
                 final_eidos = new_e.strip() if new_e else ""
                 final_eidos_code = generate_latin_code(final_eidos) if final_eidos else "NEW"
             else:
                 final_eidos = sel_eidos
-                final_eidos_code = list_eidov[sel_eidos]
+                final_eidos_code = list_eidov[sel_eidos] if sel_eidos else "INV"
 
             # ΠΡΟΜΗΘΕΥΤΗΣ
             prom_opts = sorted(list(list_prom.keys())) + ["➕ Προσθήκη Νέου..."]
-            sel_prom = c2.selectbox("Προμηθευτής", prom_opts)
+            sel_prom = c2.selectbox("Προμηθευτής", prom_opts, key=f"prom_{rk}")
             if sel_prom == "➕ Προσθήκη Νέου...":
-                new_p = c2.text_input("Νέος Προμηθευτής")
+                new_p = c2.text_input("Νέος Προμηθευτής", key=f"new_p_{rk}")
                 final_prom = new_p.strip() if new_p else ""
                 final_prom_code = generate_latin_code(final_prom) if final_prom else "NEW"
             else:
                 final_prom = sel_prom
-                final_prom_code = list_prom[sel_prom]
+                final_prom_code = list_prom[sel_prom] if sel_prom else "PRM"
 
             # ΧΡΩΜΑ
             chroma_opts = sorted(list(list_chroma.keys())) + ["➕ Προσθήκη Νέου..."]
-            sel_chroma = c3.selectbox("Χρώμα", chroma_opts)
+            sel_chroma = c3.selectbox("Χρώμα", chroma_opts, key=f"chroma_{rk}")
             if sel_chroma == "➕ Προσθήκη Νέου...":
-                new_c = c3.text_input("Νέο Χρώμα")
+                new_c = c3.text_input("Νέο Χρώμα", key=f"new_c_{rk}")
                 final_chroma = new_c.strip() if new_c else ""
                 final_chroma_code = generate_latin_code(final_chroma) if final_chroma else "NEW"
             else:
                 final_chroma = sel_chroma
-                final_chroma_code = list_chroma[sel_chroma]
+                final_chroma_code = list_chroma[sel_chroma] if sel_chroma else "COL"
             
             c4, c5, c6 = st.columns(3)
             
             # ΜΕΓΕΘΟΣ
-            sel_size = c4.selectbox("Μέγεθος", list_size)
-            final_size = c4.text_input("Νέο Μέγεθος") if sel_size == "➕ Προσθήκη Νέου..." else sel_size
+            sel_size = c4.selectbox("Μέγεθος", list_size, key=f"size_{rk}")
+            final_size = c4.text_input("Νέο Μέγεθος", key=f"new_sz_{rk}") if sel_size == "➕ Προσθήκη Νέου..." else sel_size
             
             # ΣΥΝΘΕΣΗ
-            chosen_synth = c5.selectbox("Σύνθεση", sorted(base_synth))
-            final_synth = c5.text_input("Γράψτε τη νέα σύνθεση") if chosen_synth == "➕ Προσθήκη Νέου..." else chosen_synth
+            chosen_synth = c5.selectbox("Σύνθεση", sorted(base_synth), key=f"synth_{rk}")
+            final_synth = c5.text_input("Γράψτε τη νέα σύνθεση", key=f"new_sy_{rk}") if chosen_synth == "➕ Προσθήκη Νέου..." else chosen_synth
                 
-            design_id = c6.text_input("Κωδικός Σχεδίου", placeholder="π.χ. 001")
+            design_id = c6.text_input("Κωδικός Σχεδίου", placeholder="π.χ. 001", key=f"design_{rk}")
             
             c7, c8, c9 = st.columns(3)
-            price = c7.number_input("Τιμή Λιανικής (€)", min_value=0.0, step=0.1)
-            stock = c8.number_input("Ποσότητα (Stock)", min_value=0, step=1)
-            label_count = c9.number_input("Ετικέτες προς εκτύπωση", min_value=0, value=stock)
+            price = c7.number_input("Τιμή Λιανικής (€)", min_value=0.0, step=0.1, key=f"price_{rk}")
+            stock = c8.number_input("Ποσότητα (Stock)", min_value=0, step=1, key=f"stock_{rk}")
+            label_count = c9.number_input("Ετικέτες προς εκτύπωση", min_value=0, value=stock, key=f"label_{rk}")
             
+            generated_sku = ""
+            full_name = ""
             if design_id and final_eidos:
                 generated_sku = f"{final_eidos_code}-{final_prom_code}-{design_id}-{final_chroma_code}-{final_size}".upper()
                 full_name = f"{final_eidos.upper()} - {final_chroma.upper()} ({final_synth})"
                 st.info(f"🏷️ **SKU:** {generated_sku} | **Όνομα:** {full_name}")
             
-            if st.button("💾 Αποθήκευση & Παραγωγή Ετικετών", use_container_width=True):
-                if design_id and final_synth and final_eidos:
-                    try:
-                        supabase.table("inventory").upsert({
-                            "barcode": generated_sku, 
-                            "name": full_name, 
-                            "price": float(price), 
-                            "stock": int(stock)
-                        }).execute()
-                        st.success(f"Αποθηκεύτηκε επιτυχώς!")
-                        time.sleep(1); st.rerun()
-                    except Exception as e: st.error(f"Σφάλμα: {e}")
-                else: st.warning("Συμπληρώστε όλα τα απαραίτητα πεδία.")
-
-        st.divider()
-        res = supabase.table("inventory").select("*").execute()
-        if res.data:
-            df_inv = pd.DataFrame(res.data).sort_values(by='name')
-            for _, r in df_inv.iterrows():
-                col1, col2 = st.columns([5, 1])
-                stk_c = "#e74c3c" if r['stock'] <= 0 else "#2ecc71"
-                txt = "📦 {} | {} | {:.2f}€ | Stock: <span style='color:{};'>{}</span>".format(r['barcode'], r['name'], r['price'], stk_c, r['stock'])
-                with col1: st.markdown("<div class='data-row'>{}</div>".format(txt), unsafe_allow_html=True)
-                with col2:
-                    if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
-                        supabase.table("inventory").delete().eq("barcode", r['barcode']).execute(); st.rerun()
-
-    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
-        st.title("👥 Διαχείριση Πελατών")
-        res_c = supabase.table("customers").select("*").execute()
-        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
-        if res_c.data:
-            sales_data = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
-            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
-                pts = int(sales_data[sales_data['cust_id'] == r['id']]['final_item_price'].sum() // 10)
-                col1, col2, col3 = st.columns([5, 1, 1])
-                with col1: st.markdown("<div class='data-row'>👤 {} | 📞 {} | ⭐ {} pts</div>".format(r['name'], r['phone'], pts), unsafe_allow_html=True)
-                with col2:
-                    if st.button("⭐", key="pts_{}".format(r['id']), use_container_width=True): show_customer_history(r['id'], r['name'])
-                with col3:
-                    if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
-                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
-
-    elif current_view == "⚙️ SYSTEM" and supabase:
-        st.title("⚙️ Ρυθμίσεις Συστήματος")
-        if st.text_input("Κωδικός SYSTEM", type="password") == "999":
-            target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
-            if target != "---" and st.text_input("Γράψτε ΔΙΑΓΡΑΦΗ") == "ΔΙΑΓΡΑΦΗ":
-                if st.button("ΕΚΤΕΛΕΣΗ"):
-                    supabase.table(target.lower()).delete().neq("id", -1).execute()
-                    st.success("Έγινε!"); time.sleep(1); st.rerun()
+            if st.button("
