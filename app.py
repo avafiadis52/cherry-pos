@@ -27,8 +27,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.3.7) ---
-st.set_page_config(page_title="CHERRY v14.3.7", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.3.8) ---
+st.set_page_config(page_title="CHERRY v14.3.8", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -125,7 +125,13 @@ def play_sound(url):
 @st.dialog("🏷️ Εκτύπωση Ετικέτας")
 def print_label_popup(bc, name, price):
     st.write("Προεπισκόπηση Ετικέτας:")
-    # Απόσπαση σύνθεσης αν υπάρχει μέσα στην παρένθεση στο όνομα
+    
+    # Ανάλυση Barcode (Μορφή: EID-PRO-SCHEDIO)
+    parts = bc.split('-')
+    prov_code = parts[1] if len(parts) > 1 else "---"
+    design_code = parts[2] if len(parts) > 2 else "---"
+    
+    # Απόσπαση σύνθεσης
     comp_match = re.search(r'\((.*?)\)', name)
     comp_text = comp_match.group(1) if comp_match else "---"
     clean_name = re.sub(r'\(.*?\)', '', name).strip()
@@ -133,12 +139,15 @@ def print_label_popup(bc, name, price):
     label_html = """
     <div style="width: 280px; border: 2px solid black; padding: 15px; text-align: center; background-color: white; color: black; font-family: Arial;">
         <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">CHERRY SHOP</div>
-        <div style="font-size: 11px; margin-bottom: 3px;">{}</div>
-        <div style="font-size: 10px; color: #555; margin-bottom: 8px;">Σύνθεση: {}</div>
-        <div style="font-size: 22px; font-weight: bold; border-top: 1px solid black; border-bottom: 1px solid black; padding: 5px 0; margin: 5px 0;">{:.2f}€</div>
+        <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">{}</div>
+        <div style="font-size: 9px; color: #333; margin-bottom: 5px;">
+            Προμ: {} | Σχέδιο: {}<br>
+            Σύνθεση: {}
+        </div>
+        <div style="font-size: 24px; font-weight: bold; border-top: 1px solid black; border-bottom: 1px solid black; padding: 5px 0; margin: 5px 0;">{:.2f}€</div>
         <div style="font-size: 13px; font-family: 'Courier New', monospace; font-weight: bold; letter-spacing: 2px; background: #f0f0f0; padding: 4px;">{}</div>
     </div>
-    """.format(clean_name, comp_text, price, bc)
+    """.format(clean_name, prov_code, design_code, comp_text, price, bc)
     
     st.markdown(label_html, unsafe_allow_html=True)
     st.divider()
