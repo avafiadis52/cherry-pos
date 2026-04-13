@@ -512,6 +512,7 @@ else:
                         if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
                             supabase.table("inventory").delete().eq("barcode", r['barcode']).execute()
                             st.rerun()
+                            
 elif current_view == "⚙️ SYSTEM" and supabase:
         st.title("⚙️ Ρυθμίσεις Συστήματος")
         if st.text_input("Κωδικός SYSTEM", type="password") == "999":
