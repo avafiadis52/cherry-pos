@@ -474,26 +474,51 @@ else:
                         except Exception as e: st.error("Σφάλμα: {}".format(e))
                     else: st.warning("Παρακαλώ δώστε Σχέδιο/Κωδικό.")
 
-        with tab_settings:
-            st.subheader("Διαχείριση Λιστών Επιλογής")
-            cat = st.selectbox("Επιλέξτε Λίστα", list(st.session_state.master_lists.keys()))
-            new_val = st.text_input("Νέα Τιμή")
-            if st.button("Προσθήκη στη Λίστα"):
+         with tab_settings:
+            st.subheader("⚙️ Διαχείριση Λιστών Επιλογής")
+            cat = st.selectbox("Επιλέξτε Λίστα για επεξεργασία", list(st.session_state.master_lists.keys()))
+            
+            # --- ΠΡΟΣΘΗΚΗ ΝΕΟΥ ---
+            col_add1, col_add2 = st.columns([3, 1])
+            new_val = col_add1.text_input("Νέα Τιμή", key="new_val_input")
+            if col_add2.button("➕ Προσθήκη", use_container_width=True):
                 if new_val and new_val not in st.session_state.master_lists[cat]:
                     st.session_state.master_lists[cat].append(new_val)
                     st.session_state.master_lists[cat].sort()
-                    if supabase:
-                        try:
-                            # Προσπάθεια μόνιμης αποθήκευσης στον πίνακα inventory_settings
-                            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
-                            st.success(f"Το '{new_val}' προστέθηκε και αποθηκεύτηκε!")
-                        except Exception:
-                            # Αν ο πίνακας δεν υπάρχει, το κρατάμε στο session και ενημερώνουμε τον χρήστη
-                            st.warning(f"Το '{new_val}' προστέθηκε προσωρινά (Δεν βρέθηκε πίνακας στη Supabase)")
+                    try:
+                        supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
+                        st.success(f"Το '{new_val}' προστέθηκε!")
                         time.sleep(0.5); st.rerun()
+                    except Exception: st.warning("Προστέθηκε προσωρινά (Database Offline)")
+
+            st.divider()
+
+            # --- ΛΙΣΤΑ ΣΤΟΙΧΕΙΩΝ ΓΙΑ ΤΡΟΠΟΠΟΙΗΣΗ/ΔΙΑΓΡΑΦΗ ---
+            st.write(f"Στοιχεία στη λίστα **{cat}**:")
             
-            sorted_vals = sorted(st.session_state.master_lists[cat])
-            st.write("Τρέχουσες τιμές:", ", ".join(sorted_vals))
+            for idx, item in enumerate(sorted(st.session_state.master_lists[cat])):
+                c1, c2, c3 = st.columns([3, 1, 0.5])
+                
+                # Τροποποίηση (Edit)
+                new_name = c1.text_input(f"Edit {idx}", value=item, label_visibility="collapsed", key=f"edit_{cat}_{idx}")
+                
+                if new_name != item: # Αν ο χρήστης αλλάξει το κείμενο
+                    if c2.button("💾 Save", key=f"save_{cat}_{idx}", use_container_width=True):
+                        st.session_state.master_lists[cat] = [new_name if x == item else x for x in st.session_state.master_lists[cat]]
+                        try:
+                            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
+                            st.success("Τροποποιήθηκε!")
+                            time.sleep(0.5); st.rerun()
+                        except Exception: st.rerun()
+                
+                # Διαγραφή (Delete)
+                if c3.button("🗑️", key=f"del_{cat}_{idx}"):
+                    st.session_state.master_lists[cat].remove(item)
+                    try:
+                        supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
+                        st.error(f"Το '{item}' διαγράφηκε!")
+                        time.sleep(0.5); st.rerun()
+                    except Exception: st.rerun()
 
         with tab_list:
             st.subheader("Τρέχον Απόθεμα")
