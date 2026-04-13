@@ -512,7 +512,24 @@ else:
                         if st.button("❌", key="inv_{}".format(r['barcode']), use_container_width=True):
                             supabase.table("inventory").delete().eq("barcode", r['barcode']).execute()
                             st.rerun()
-                            
+
+    elif current_view == "👥 ΠΕΛΑΤΕΣ" and supabase:
+        st.title("👥 Διαχείριση Πελατών")
+        res_c = supabase.table("customers").select("*").execute()
+        res_s = supabase.table("sales").select("cust_id, final_item_price").execute()
+        if res_c.data:
+            sales_data = pd.DataFrame(res_s.data) if res_s.data else pd.DataFrame(columns=['cust_id', 'final_item_price'])
+            for _, r in pd.DataFrame(res_c.data).sort_values(by='name').iterrows():
+                pts = int(sales_data[sales_data['cust_id'] == r['id']]['final_item_price'].sum() // 10)
+                col1, col2, col3 = st.columns([5, 1, 1])
+                with col1: st.markdown("<div class='data-row'>👤 {} | 📞 {} | ⭐ {} pts</div>".format(r['name'], r['phone'], pts), unsafe_allow_html=True)
+                with col2:
+                    if st.button("⭐", key="pts_{}".format(r['id']), use_container_width=True):
+                        show_customer_history(r['id'], r['name'])
+                with col3:
+                    if st.button("❌", key="d_{}".format(r['id']), use_container_width=True):
+                        supabase.table("customers").delete().eq("id", r['id']).execute(); st.rerun()
+    
     elif current_view == "⚙️ SYSTEM" and supabase:
         st.title("⚙️ Ρυθμίσεις Συστήματος")
         if st.text_input("Κωδικός SYSTEM", type="password") == "999":
