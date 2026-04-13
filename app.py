@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.3) ---
-st.set_page_config(page_title="CHERRY v14.5.3", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.4) ---
+st.set_page_config(page_title="CHERRY v14.5.4", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -92,6 +92,7 @@ def get_global_lists():
         "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
     }
 
+# Φόρτωση των λιστών στο session state
 st.session_state.master_lists = get_global_lists()
 
 # --- 4. FUNCTIONS ---
