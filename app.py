@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.4) ---
-st.set_page_config(page_title="CHERRY v14.5.4", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.5) ---
+st.set_page_config(page_title="CHERRY v14.5.5", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -505,7 +505,8 @@ else:
             for val in sorted(st.session_state.master_lists[cat]):
                 col1, col2, col3 = st.columns([4, 2, 1])
                 with col1:
-                    st.text(val)
+                    # Αλλαγή στο χρώμα της γραμματοσειράς για να είναι ορατά τα αντικείμενα
+                    st.markdown(f"<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
                 with col2:
                     # Rename Logic
                     new_name = st.text_input("Μετονομασία", key=f"ren_txt_{val}", placeholder="Νέο όνομα...", label_visibility="collapsed")
