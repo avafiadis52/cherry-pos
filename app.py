@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.2) ---
-st.set_page_config(page_title="CHERRY v14.5.2", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.3) ---
+st.set_page_config(page_title="CHERRY v14.5.3", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -82,25 +82,17 @@ if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
-# Φόρτωση Λιστών από τη βάση για ΜΟΝΙΜΗ αποθήκευση
-if 'master_lists' not in st.session_state:
-    try:
-        res = supabase.table("app_settings").select("*").eq("setting_key", "master_lists").execute()
-        if res.data:
-            st.session_state.master_lists = res.data[0]['setting_value']
-        else:
-            # Αρχικές τιμές αν η βάση είναι άδεια
-            initial_lists = {
-                "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
-                "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
-                "Χρώματα": ["Γκρι", "Εκρού", "Εμπριμέ", "Καφέ", "Κίτρινο", "Κόκκινο", "Λευκό", "Μαύρο", "Μπεζ", "Μπλε", "Πουά", "Πράσινο", "Ριγέ", "Σιέλ"],
-                "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
-            }
-            supabase.table("app_settings").upsert({"setting_key": "master_lists", "setting_value": initial_lists}).execute()
-            st.session_state.master_lists = initial_lists
-    except Exception:
-        # Fallback αν δεν υπάρχει πίνακας app_settings
-        st.session_state.master_lists = {"Είδη": [], "Προμηθευτές": [], "Χρώματα": [], "Συνθέσεις": []}
+# --- ΛΕΙΤΟΥΡΓΙΑ ΜΟΝΙΜΩΝ ΛΙΣΤΩΝ (Global Persistent Lists) ---
+@st.cache_resource
+def get_global_lists():
+    return {
+        "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
+        "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
+        "Χρώματα": ["Γκρι", "Εκρού", "Εμπριμέ", "Καφέ", "Κίτρινο", "Κόκκινο", "Λευκό", "Μαύρο", "Μπεζ", "Μπλε", "Πουά", "Πράσινο", "Ριγέ", "Σιέλ"],
+        "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
+    }
+
+st.session_state.master_lists = get_global_lists()
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -378,16 +370,10 @@ else:
             
             if st.button("Προσθήκη στη Λίστα"):
                 if new_val and new_val.upper() not in [x.upper() for x in st.session_state.master_lists[cat]]:
-                    # Προσθήκη τοπικά
+                    # Προσθήκη στην Cache Resource Λίστα (Global για την εφαρμογή)
                     st.session_state.master_lists[cat].append(new_val.upper())
-                    # Ταξινόμηση αλφαβητικά
                     st.session_state.master_lists[cat].sort()
-                    # Μόνιμη αποθήκευση στη Supabase
-                    supabase.table("app_settings").upsert({
-                        "setting_key": "master_lists", 
-                        "setting_value": st.session_state.master_lists
-                    }).execute()
-                    st.success(f"Το '{new_val.upper()}' προστέθηκε μόνιμα!")
+                    st.success(f"Το '{new_val.upper()}' προστέθηκε!")
                     time.sleep(1); st.rerun()
             
             st.write("Τρέχουσες τιμές (Αλφαβητικά):")
