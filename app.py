@@ -513,7 +513,7 @@ else:
                             supabase.table("inventory").delete().eq("barcode", r['barcode']).execute()
                             st.rerun()
                             
-elif current_view == "⚙️ SYSTEM" and supabase:
+    elif current_view == "⚙️ SYSTEM" and supabase:
         st.title("⚙️ Ρυθμίσεις Συστήματος")
         if st.text_input("Κωδικός SYSTEM", type="password") == "999":
             target = st.selectbox("Αρχικοποίηση", ["---", "Sales", "Customers", "Inventory"])
