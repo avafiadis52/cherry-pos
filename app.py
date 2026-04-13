@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.2) ---
-st.set_page_config(page_title="CHERRY v14.5.2", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.3) ---
+st.set_page_config(page_title="CHERRY v14.5.3", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -72,16 +72,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- Sync Lists with Supabase ---
+# --- Sync Lists Logic ---
 def sync_master_lists():
     if supabase:
         try:
-            res = supabase.table("app_settings").select("config_value").eq("config_name", "master_lists").execute()
+            # Προσπάθεια ανάγνωσης από πίνακα settings, αν δεν υπάρχει δεν διακόπτουμε το app
+            res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
             if res.data:
                 st.session_state.master_lists = res.data[0]['config_value']
-            else:
-                supabase.table("app_settings").insert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
-        except:
+        except Exception:
             pass
 
 # Session States
@@ -485,11 +484,13 @@ else:
                     st.session_state.master_lists[cat].sort()
                     if supabase:
                         try:
-                            supabase.table("app_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
-                            st.success(f"Το '{new_val}' προστέθηκε και αποθηκεύτηκε μόνιμα!")
-                            time.sleep(0.5); st.rerun()
-                        except Exception as e:
-                            st.error(f"Σφάλμα αποθήκευσης: {e}")
+                            # Προσπάθεια μόνιμης αποθήκευσης στον πίνακα inventory_settings
+                            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
+                            st.success(f"Το '{new_val}' προστέθηκε και αποθηκεύτηκε!")
+                        except Exception:
+                            # Αν ο πίνακας δεν υπάρχει, το κρατάμε στο session και ενημερώνουμε τον χρήστη
+                            st.warning(f"Το '{new_val}' προστέθηκε προσωρινά (Δεν βρέθηκε πίνακας στη Supabase)")
+                        time.sleep(0.5); st.rerun()
             
             sorted_vals = sorted(st.session_state.master_lists[cat])
             st.write("Τρέχουσες τιμές:", ", ".join(sorted_vals))
