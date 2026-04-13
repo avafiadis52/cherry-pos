@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.5) ---
-st.set_page_config(page_title="CHERRY v14.5.5", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.6) ---
+st.set_page_config(page_title="CHERRY v14.5.6", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -72,7 +72,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- Sync Lists Logic ---
+# --- Sync Lists Logic (FIXED FOR MISSING TABLE) ---
 def sync_master_lists():
     if supabase:
         try:
@@ -80,6 +80,7 @@ def sync_master_lists():
             if res.data:
                 st.session_state.master_lists = res.data[0]['config_value']
         except Exception:
+            # Αν ο πίνακας δεν υπάρχει, συνεχίζουμε με τις default λίστες
             pass
 
 def save_master_lists():
@@ -88,8 +89,9 @@ def save_master_lists():
             supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
             return True
         except Exception as e:
-            st.error(f"Σφάλμα αποθήκευσης: {e}")
-            return False
+            # Αν αποτύχει η εγγραφή στη βάση, τουλάχιστον οι αλλαγές μένουν στο τρέχον session
+            st.warning("Η αλλαγή έγινε τοπικά, αλλά δεν αποθηκεύτηκε στη βάση (Πίνακας inventory_settings μη διαθέσιμος).")
+            return True
 
 # Session States
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
@@ -505,10 +507,8 @@ else:
             for val in sorted(st.session_state.master_lists[cat]):
                 col1, col2, col3 = st.columns([4, 2, 1])
                 with col1:
-                    # Αλλαγή στο χρώμα της γραμματοσειράς για να είναι ορατά τα αντικείμενα
                     st.markdown(f"<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
                 with col2:
-                    # Rename Logic
                     new_name = st.text_input("Μετονομασία", key=f"ren_txt_{val}", placeholder="Νέο όνομα...", label_visibility="collapsed")
                     if st.button("💾", key=f"ren_btn_{val}"):
                         if new_name and new_name not in st.session_state.master_lists[cat]:
@@ -518,7 +518,6 @@ else:
                             if save_master_lists():
                                 st.success("Μετονομάστηκε!"); time.sleep(0.5); st.rerun()
                 with col3:
-                    # Delete Logic
                     if st.button("🗑️", key=f"del_list_{val}"):
                         st.session_state.master_lists[cat].remove(val)
                         if save_master_lists():
