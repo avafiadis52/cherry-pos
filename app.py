@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.3) ---
-st.set_page_config(page_title="CHERRY v14.5.3", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.4) ---
+st.set_page_config(page_title="CHERRY v14.5.4", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -41,9 +41,9 @@ st.markdown("""
     input { color: #000000 !important; font-weight: bold !important; }
     
     .cart-area { 
-        font-family: 'Courier New', monospace; 
+        font-family: 'Courier New', monospace;
         background-color: #000000; padding: 15px; border-radius: 10px; 
-        white-space: pre; border: 4px solid #2ecc71 !important; 
+        white-space: pre; border: 4px solid #2ecc71 !important;
         box-shadow: 0 0 15px rgba(46, 204, 113, 0.4); min-height: 300px; 
         color: #2ecc71;
         overflow-x: auto;
@@ -76,12 +76,20 @@ st.markdown("""
 def sync_master_lists():
     if supabase:
         try:
-            # Προσπάθεια ανάγνωσης από πίνακα settings, αν δεν υπάρχει δεν διακόπτουμε το app
             res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
             if res.data:
                 st.session_state.master_lists = res.data[0]['config_value']
         except Exception:
             pass
+
+def save_master_lists():
+    if supabase:
+        try:
+            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
+            return True
+        except Exception as e:
+            st.error(f"Σφάλμα αποθήκευσης: {e}")
+            return False
 
 # Session States
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
@@ -407,6 +415,7 @@ else:
                         pc2.markdown("<div class='report-stat'>💳 Κάρτα<div class='stat-val'>{:.2f}€</div><div class='stat-desc'>{} πράξεις</div></div>".format(p_ct['final_item_price'].sum(), p_ct['s_date'].nunique()), unsafe_allow_html=True)
                         pc3.markdown("<div class='report-stat'>📉 Εκπτώσεις<div class='stat-val' style='color:#e74c3c;'>{:.2f}€</div></div>".format(p_df['discount'].sum()), unsafe_allow_html=True)
                         st.divider()
+                    
                         for d_day in sorted(p_df['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True):
                             d_df = p_df[p_df['ΗΜΕΡΟΜΗΝΙΑ'] == d_day].copy()
                             dm_t, dc_t = d_df[d_df['method'] == 'Μετρητά'], d_df[d_df['method'] == 'Κάρτα']
@@ -430,6 +439,7 @@ else:
                         m2.metric("Μέση Πώληση", f"{(idf['final_item_price'].sum() / idf['s_date'].nunique()):.2f}€")
                         m3.metric("Πλήθος Πράξεων", idf['s_date'].nunique())
                         st.divider()
+                        
                         top_items_val = idf.groupby('item_name')['final_item_price'].sum().nlargest(10).reset_index()
                         fig1 = px.bar(top_items_val, x='final_item_price', y='item_name', orientation='h', title="Top 10 Προϊόντα (€)", color_discrete_sequence=['#2ecc71'])
                         st.plotly_chart(fig1, use_container_width=True)
@@ -477,23 +487,41 @@ else:
         with tab_settings:
             st.subheader("Διαχείριση Λιστών Επιλογής")
             cat = st.selectbox("Επιλέξτε Λίστα", list(st.session_state.master_lists.keys()))
-            new_val = st.text_input("Νέα Τιμή")
-            if st.button("Προσθήκη στη Λίστα"):
-                if new_val and new_val not in st.session_state.master_lists[cat]:
-                    st.session_state.master_lists[cat].append(new_val)
-                    st.session_state.master_lists[cat].sort()
-                    if supabase:
-                        try:
-                            # Προσπάθεια μόνιμης αποθήκευσης στον πίνακα inventory_settings
-                            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
-                            st.success(f"Το '{new_val}' προστέθηκε και αποθηκεύτηκε!")
-                        except Exception:
-                            # Αν ο πίνακας δεν υπάρχει, το κρατάμε στο session και ενημερώνουμε τον χρήστη
-                            st.warning(f"Το '{new_val}' προστέθηκε προσωρινά (Δεν βρέθηκε πίνακας στη Supabase)")
-                        time.sleep(0.5); st.rerun()
             
-            sorted_vals = sorted(st.session_state.master_lists[cat])
-            st.write("Τρέχουσες τιμές:", ", ".join(sorted_vals))
+            # 1. Προσθήκη
+            with st.expander("➕ Προσθήκη Νέου"):
+                new_val = st.text_input("Νέα Τιμή", key="add_new_val")
+                if st.button("Προσθήκη στη Λίστα"):
+                    if new_val and new_val not in st.session_state.master_lists[cat]:
+                        st.session_state.master_lists[cat].append(new_val)
+                        st.session_state.master_lists[cat].sort()
+                        if save_master_lists():
+                            st.success(f"Το '{new_val}' προστέθηκε!")
+                            time.sleep(0.5); st.rerun()
+
+            # 2. Διαχείριση Υπαρχόντων
+            st.write("---")
+            st.write(f"Τρέχουσες τιμές στην κατηγορία **{cat}**:")
+            for val in sorted(st.session_state.master_lists[cat]):
+                col1, col2, col3 = st.columns([4, 2, 1])
+                with col1:
+                    st.text(val)
+                with col2:
+                    # Rename Logic
+                    new_name = st.text_input("Μετονομασία", key=f"ren_txt_{val}", placeholder="Νέο όνομα...", label_visibility="collapsed")
+                    if st.button("💾", key=f"ren_btn_{val}"):
+                        if new_name and new_name not in st.session_state.master_lists[cat]:
+                            idx = st.session_state.master_lists[cat].index(val)
+                            st.session_state.master_lists[cat][idx] = new_name
+                            st.session_state.master_lists[cat].sort()
+                            if save_master_lists():
+                                st.success("Μετονομάστηκε!"); time.sleep(0.5); st.rerun()
+                with col3:
+                    # Delete Logic
+                    if st.button("🗑️", key=f"del_list_{val}"):
+                        st.session_state.master_lists[cat].remove(val)
+                        if save_master_lists():
+                            st.warning("Διαγράφηκε!"); time.sleep(0.5); st.rerun()
 
         with tab_list:
             st.subheader("Τρέχον Απόθεμα")
