@@ -31,15 +31,14 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.7.7) ---
-st.set_page_config(page_title="CHERRY v14.7.7", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.7.8) ---
+st.set_page_config(page_title="CHERRY v14.7.8", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
     .stApp { background-color: #1a1a1a; color: white; }
     label, [data-testid="stWidgetLabel"] p { color: #ffffff !important; font-weight: 700 !important; font-size: 1.1rem !important; }
     input { color: #000000 !important; font-weight: bold !important; }
-    
     .cart-area { 
         font-family: 'Courier New', monospace;
         background-color: #000000; padding: 15px; border-radius: 10px; 
@@ -60,7 +59,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Default Lists Definition
 DEFAULT_LISTS = {
     "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
     "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
@@ -70,20 +68,20 @@ DEFAULT_LISTS = {
 }
 
 def save_master_lists():
-    if supabase:
+    if supabase and 'master_lists' in st.session_state:
         try:
             supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
             return True
         except: return False
 
-def sync_master_lists(force=False):
-    # Αν το force είναι True ή αν δεν υπάρχουν οι λίστες στο session_state, τράβα τες από τη βάση
-    if 'master_lists' not in st.session_state or force:
+def sync_master_lists():
+    if 'master_lists' not in st.session_state:
         if supabase:
             try:
                 res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
                 if res.data:
                     remote_data = res.data[0]['config_value']
+                    # Merge missing keys from defaults
                     for key, val in DEFAULT_LISTS.items():
                         if key not in remote_data: remote_data[key] = val
                     st.session_state.master_lists = remote_data
@@ -91,9 +89,9 @@ def sync_master_lists(force=False):
                     st.session_state.master_lists = DEFAULT_LISTS.copy()
                     save_master_lists()
             except:
-                if 'master_lists' not in st.session_state: st.session_state.master_lists = DEFAULT_LISTS.copy()
+                st.session_state.master_lists = DEFAULT_LISTS.copy()
 
-# Session States initialization
+# Initialize session states
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
@@ -299,10 +297,8 @@ else:
         t_new, t_set, t_inv = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ", "📋 ΑΠΟΘΕΜΑ"])
         
         with t_new:
-            # Υποχρεωτικό Refresh των λιστών εδώ για να πιάσει τις νέες καταχωρήσεις από τις Ρυθμίσεις
-            sync_master_lists(force=True)
-            current_lists = st.session_state.master_lists
-
+            # Εδώ φορτώνουμε τις λίστες απευθείας από το session_state
+            cur_l = st.session_state.master_lists
             last_design_info = ""
             try:
                 res_last = supabase.table("inventory").select("barcode").order("id", desc=True).limit(1).execute()
@@ -314,13 +310,13 @@ else:
             with st.form(f"inv_form_{st.session_state.form_reset_key}", clear_on_submit=True):
                 if last_design_info: st.info(f"💡 Τελευταίο Σχέδιο στη Βάση: **{last_design_info}**")
                 c1, c2, c3 = st.columns(3)
-                f_item = c1.selectbox("Είδος", [""] + sorted(current_lists.get("Είδη", [])))
-                f_prov = c2.selectbox("Προμηθευτής", [""] + sorted(current_lists.get("Προμηθευτές", [])))
-                f_color = c3.selectbox("Χρώμα", [""] + sorted(current_lists.get("Χρώματα", [])))
+                f_item = c1.selectbox("Είδος", [""] + sorted(cur_l.get("Είδη", [])))
+                f_prov = c2.selectbox("Προμηθευτής", [""] + sorted(cur_l.get("Προμηθευτές", [])))
+                f_color = c3.selectbox("Χρώμα", [""] + sorted(cur_l.get("Χρώματα", [])))
                 c4, c5, c6 = st.columns(3)
                 f_design = c4.text_input("Σχέδιο / Κωδικός", value="") 
-                f_size = c5.selectbox("Μεγέθη", [""] + sorted(current_lists.get("Μεγέθη", [])))
-                f_comp = c6.selectbox("Συνθέσεις", [""] + sorted(current_lists.get("Συνθέσεις", [])))
+                f_size = c5.selectbox("Μεγέθη", [""] + sorted(cur_l.get("Μεγέθη", [])))
+                f_comp = c6.selectbox("Συνθέσεις", [""] + sorted(cur_l.get("Συνθέσεις", [])))
                 c7, c8 = st.columns(2)
                 f_price = c7.number_input("Τιμή Πώλησης (€)", min_value=0.0, step=0.5, value=0.0)
                 f_stock = c8.number_input("Αρχικό Απόθεμα", min_value=0, value=1)
@@ -341,14 +337,15 @@ else:
             cat = st.selectbox("Επιλογή Λίστας προς Επεξεργασία", list(st.session_state.master_lists.keys()))
             new_val = st.text_input(f"Προσθήκη νέου στοιχείου στη λίστα {cat}")
             if st.button("Προσθήκη"):
-                if new_val:
-                    if new_val not in st.session_state.master_lists[cat]:
-                        st.session_state.master_lists[cat].append(new_val)
-                        st.session_state.master_lists[cat].sort()
-                        if save_master_lists(): 
-                            st.success(f"Προστέθηκε το {new_val}")
-                            time.sleep(0.5)
-                            st.rerun()
+                if new_val and new_val not in st.session_state.master_lists[cat]:
+                    # 1. Ενημέρωση τοπικής μνήμης αμέσως
+                    st.session_state.master_lists[cat].append(new_val)
+                    st.session_state.master_lists[cat].sort()
+                    # 2. Αποθήκευση στη βάση (async-like)
+                    save_master_lists()
+                    st.success(f"Προστέθηκε!")
+                    time.sleep(0.5)
+                    st.rerun()
             
             st.divider()
             for v in sorted(st.session_state.master_lists.get(cat, [])):
@@ -356,7 +353,8 @@ else:
                 col1.write(v)
                 if col2.button("🗑️", key=f"del_{cat}_{v}"):
                     st.session_state.master_lists[cat].remove(v)
-                    if save_master_lists(): st.rerun()
+                    save_master_lists()
+                    st.rerun()
 
         with t_inv:
             res = supabase.table("inventory").select("*").execute()
