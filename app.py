@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.6) ---
-st.set_page_config(page_title="CHERRY v14.5.6", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.7) ---
+st.set_page_config(page_title="CHERRY v14.5.7", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -78,7 +78,12 @@ def sync_master_lists():
         try:
             res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
             if res.data:
-                st.session_state.master_lists = res.data[0]['config_value']
+                # Merge logic to ensure new categories like "Μεγέθη" are added to existing data
+                remote_data = res.data[0]['config_value']
+                for key in st.session_state.master_lists:
+                    if key not in remote_data:
+                        remote_data[key] = st.session_state.master_lists[key]
+                st.session_state.master_lists = remote_data
         except Exception:
             pass
 
@@ -106,6 +111,7 @@ if 'master_lists' not in st.session_state:
         "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
         "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
         "Χρώματα": ["Γκρι", "Εκρού", "Εμπριμέ", "Καφέ", "Κίτρινο", "Κόκκινο", "Λευκό", "Μαύρο", "Μπεζ", "Μπλε", "Πουά", "Πράσινο", "Ριγέ", "Σιέλ"],
+        "Μεγέθη": ["One Size", "Small", "Medium", "Large", "XL", "XXL", "36", "38", "40", "42", "44"],
         "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
     }
     sync_master_lists()
@@ -463,15 +469,21 @@ else:
                 f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists["Είδη"]))
                 f_prov = c2.selectbox("Προμηθευτής", sorted(st.session_state.master_lists["Προμηθευτές"]))
                 f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists["Χρώματα"]))
+                
                 c4, c5, c6 = st.columns(3)
                 f_design = c4.text_input("Σχέδιο / Κωδικός (π.χ. 1022)")
-                f_comp = c5.selectbox("Σύνθεση", sorted(st.session_state.master_lists["Συνθέσεις"]))
-                f_price = c6.number_input("Τιμή Πώλησης (€)", min_value=0.0, step=1.0)
-                f_stock = st.number_input("Αρχικό Απόθεμα", min_value=0, value=1)
+                f_size = c5.selectbox("Μέγεθος", sorted(st.session_state.master_lists["Μεγέθη"]))
+                f_comp = c6.selectbox("Σύνθεση", sorted(st.session_state.master_lists["Συνθέσεις"]))
+                
+                c7, c8 = st.columns(2)
+                f_price = c7.number_input("Τιμή Πώλησης (€)", min_value=0.0, step=1.0)
+                f_stock = c8.number_input("Αρχικό Απόθεμα", min_value=0, value=1)
+                
                 if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ ΠΡΟΪΟΝΤΟΣ"):
                     if f_design:
+                        # Barcode structure: ITEM-PROV-DESIGN (no change to remain backward compatible or adjust as needed)
                         sku = "{}-{}-{}".format(generate_latin_code(f_item), generate_latin_code(f_prov), f_design.upper())
-                        full_name = "{} {} ({})".format(f_item, f_color, f_comp).upper()
+                        full_name = "{} {} ({}) [{}]".format(f_item, f_color, f_comp, f_size).upper()
                         try:
                             supabase.table("inventory").upsert({
                                 "barcode": sku, 
