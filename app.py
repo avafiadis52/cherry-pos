@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.6.8) ---
-st.set_page_config(page_title="CHERRY v14.6.8", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.6.9) ---
+st.set_page_config(page_title="CHERRY v14.6.9", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -295,7 +295,18 @@ else:
         t_new, t_set, t_inv = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ", "📋 ΑΠΟΘΕΜΑ"])
         
         with t_new:
-            # Χρήση st.form με clear_on_submit=True
+            # Εύρεση τελευταίας καταχώρησης για το πεδίο Σχέδιο/Κωδικός
+            last_design_val = ""
+            try:
+                res_last = supabase.table("inventory").select("barcode").order("created_at", desc=True).limit(1).execute()
+                if res_last.data:
+                    # Εξαγωγή του τμήματος "Σχέδιο" από το barcode (Format: Eidos-Prom-SXEDIO-Xroma-Megethos)
+                    parts = res_last.data[0]['barcode'].split('-')
+                    if len(parts) >= 3:
+                        last_design_val = parts[2]
+            except:
+                pass
+
             with st.form("inventory_form", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
                 f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists.get("Είδη", [])))
@@ -303,7 +314,8 @@ else:
                 f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists.get("Χρώματα", [])))
                 
                 c4, c5, c6 = st.columns(3)
-                f_design = c4.text_input("Σχέδιο / Κωδικός", value="", key="f_design_inp") 
+                # Εμφάνιση της τελευταίας τιμής ως placeholder
+                f_design = c4.text_input("Σχέδιο / Κωδικός", value="", placeholder=f"Τελευταίο: {last_design_val}", key="f_design_inp") 
                 f_size = c5.selectbox("Μέγεθος", sorted(st.session_state.master_lists.get("Μεγέθη", [])))
                 f_comp = c6.selectbox("Σύνθεση", sorted(st.session_state.master_lists.get("Συνθέσεις", [])))
                 
