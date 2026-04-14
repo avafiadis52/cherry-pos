@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.8) ---
-st.set_page_config(page_title="CHERRY v14.5.8", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.9) ---
+st.set_page_config(page_title="CHERRY v14.5.9", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -72,34 +72,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- Sync Lists Logic ---
-def sync_master_lists():
-    if supabase:
-        try:
-            res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
-            if res.data:
-                remote_data = res.data[0]['config_value']
-                # Διασφάλιση ότι όλα τα default κλειδιά υπάρχουν στα δεδομένα της βάσης
-                updated = False
-                for key, default_val in DEFAULT_LISTS.items():
-                    if key not in remote_data:
-                        remote_data[key] = default_val
-                        updated = True
-                st.session_state.master_lists = remote_data
-                if updated:
-                    save_master_lists()
-        except Exception:
-            pass
-
-def save_master_lists():
-    if supabase:
-        try:
-            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
-            return True
-        except Exception as e:
-            st.warning("Η αλλαγή έγινε τοπικά, αλλά δεν αποθηκεύτηκε στη βάση.")
-            return True
-
 # Default Lists Definition
 DEFAULT_LISTS = {
     "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
@@ -108,6 +80,37 @@ DEFAULT_LISTS = {
     "Μεγέθη": ["One Size", "Small", "Medium", "Large", "XL", "XXL", "36", "38", "40", "42", "44"],
     "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
 }
+
+# --- Sync Lists Logic ---
+def save_master_lists():
+    if supabase:
+        try:
+            supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
+            return True
+        except Exception:
+            return False
+
+def sync_master_lists():
+    if supabase:
+        try:
+            res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
+            if res.data:
+                remote_data = res.data[0]['config_value']
+                updated = False
+                for key, default_val in DEFAULT_LISTS.items():
+                    if key not in remote_data:
+                        remote_data[key] = default_val
+                        updated = True
+                st.session_state.master_lists = remote_data
+                if updated:
+                    save_master_lists()
+            else:
+                # Αν δεν υπάρχει καν το config στη βάση
+                st.session_state.master_lists = DEFAULT_LISTS.copy()
+                save_master_lists()
+        except Exception:
+            if 'master_lists' not in st.session_state:
+                st.session_state.master_lists = DEFAULT_LISTS.copy()
 
 # Session States initialization
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
@@ -119,9 +122,8 @@ if 'ph_key' not in st.session_state: st.session_state.ph_key = 100
 if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
-if 'master_lists' not in st.session_state:
-    st.session_state.master_lists = DEFAULT_LISTS.copy()
-    sync_master_lists()
+# Πάντα εκτελούμε το sync στην αρχή
+sync_master_lists()
 
 # --- 4. FUNCTIONS ---
 def get_athens_now():
@@ -504,7 +506,12 @@ else:
 
         with tab_settings:
             st.subheader("Διαχείριση Λιστών Επιλογής")
-            cat = st.selectbox("Επιλέξτε Λίστα", list(st.session_state.master_lists.keys()))
+            # Προσθήκη ελέγχου για να μην είναι άδεια η selectbox αν το συγχρονισμός καθυστερήσει
+            current_lists = list(st.session_state.master_lists.keys())
+            if not current_lists:
+                current_lists = list(DEFAULT_LISTS.keys())
+            
+            cat = st.selectbox("Επιλέξτε Λίστα", current_lists)
             
             # 1. Προσθήκη
             with st.expander("➕ Προσθήκη Νέου"):
@@ -520,7 +527,7 @@ else:
             # 2. Διαχείριση Υπαρχόντων
             st.write("---")
             st.write(f"Τρέχουσες τιμές στην κατηγορία **{cat}**:")
-            for val in sorted(st.session_state.master_lists[cat]):
+            for val in sorted(st.session_state.master_lists.get(cat, [])):
                 col1, col2, col3 = st.columns([4, 2, 1])
                 with col1:
                     st.markdown(f"<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
