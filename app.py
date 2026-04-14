@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.6.3) ---
-st.set_page_config(page_title="CHERRY v14.6.3", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.6.4) ---
+st.set_page_config(page_title="CHERRY v14.6.4", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -83,7 +83,7 @@ DEFAULT_LISTS = {
 
 # --- Sync Lists Logic (CORRECTED FLOW) ---
 def save_master_lists():
-    """Άμεσο Upsert στη βάση δεδομένων [cite: 22]"""
+    """Άμεσο Upsert στη βάση δεδομένων"""
     if supabase:
         try:
             supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
@@ -92,7 +92,7 @@ def save_master_lists():
             return False
 
 def sync_master_lists(force=False):
-    """Force Sync: Διάβασμα από τη βάση για επιβεβαίωση [cite: 23, 24]"""
+    """Force Sync: Διάβασμα από τη βάση για επιβεβαίωση"""
     if 'master_lists' in st.session_state and not force:
         return
     if supabase:
@@ -534,7 +534,7 @@ else:
             for val in sorted(st.session_state.master_lists.get(cat, [])):
                 col1, col2, col3 = st.columns([4, 2, 1])
                 with col1:
-                    st.markdown(f<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
                 with col2:
                     new_name = st.text_input("Μετονομασία", key=f"ren_txt_{val}", placeholder="Νέο όνομα...", label_visibility="collapsed")
                     if st.button("💾", key=f"ren_btn_{val}"):
