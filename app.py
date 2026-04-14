@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.7.5) ---
-st.set_page_config(page_title="CHERRY v14.7.5", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.7.6) ---
+st.set_page_config(page_title="CHERRY v14.7.6", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -92,7 +92,7 @@ def sync_master_lists(force=False):
         except:
             if 'master_lists' not in st.session_state: st.session_state.master_lists = DEFAULT_LISTS.copy()
 
-# Session States
+# Session States initialization
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
@@ -338,13 +338,17 @@ else:
             if st.button("Προσθήκη"):
                 if new_val:
                     st.session_state.master_lists[cat].append(new_val); st.session_state.master_lists[cat].sort()
-                    if save_master_lists(): sync_master_lists(force=True); st.rerun()
+                    if save_master_lists(): 
+                        sync_master_lists(force=True)
+                        st.rerun() # ΕΔΩ ΓΙΝΕΤΑΙ Η ΑΜΕΣΗ ΑΝΑΝΕΩΣΗ
             for v in sorted(st.session_state.master_lists.get(cat, [])):
                 col1, col2 = st.columns([5, 1])
                 col1.write(v)
                 if col2.button("🗑️", key=f"del_{cat}_{v}"):
                     st.session_state.master_lists[cat].remove(v)
-                    if save_master_lists(): sync_master_lists(force=True); st.rerun()
+                    if save_master_lists(): 
+                        sync_master_lists(force=True)
+                        st.rerun() # ΕΔΩ ΓΙΝΕΤΑΙ Η ΑΜΕΣΗ ΑΝΑΝΕΩΣΗ
 
         with t_inv:
             res = supabase.table("inventory").select("*").execute()
