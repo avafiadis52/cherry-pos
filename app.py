@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.9) ---
-st.set_page_config(page_title="CHERRY v14.5.9", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.6.3) ---
+st.set_page_config(page_title="CHERRY v14.6.3", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -81,8 +81,9 @@ DEFAULT_LISTS = {
     "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
 }
 
-# --- Sync Lists Logic ---
+# --- Sync Lists Logic (CORRECTED FLOW) ---
 def save_master_lists():
+    """Άμεσο Upsert στη βάση δεδομένων [cite: 22]"""
     if supabase:
         try:
             supabase.table("inventory_settings").upsert({"config_name": "master_lists", "config_value": st.session_state.master_lists}).execute()
@@ -90,7 +91,10 @@ def save_master_lists():
         except Exception:
             return False
 
-def sync_master_lists():
+def sync_master_lists(force=False):
+    """Force Sync: Διάβασμα από τη βάση για επιβεβαίωση [cite: 23, 24]"""
+    if 'master_lists' in st.session_state and not force:
+        return
     if supabase:
         try:
             res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
@@ -105,7 +109,6 @@ def sync_master_lists():
                 if updated:
                     save_master_lists()
             else:
-                # Αν δεν υπάρχει καν το config στη βάση
                 st.session_state.master_lists = DEFAULT_LISTS.copy()
                 save_master_lists()
         except Exception:
@@ -458,6 +461,7 @@ else:
                         top_items_val = idf.groupby('item_name')['final_item_price'].sum().nlargest(10).reset_index()
                         fig1 = px.bar(top_items_val, x='final_item_price', y='item_name', orientation='h', title="Top 10 Προϊόντα (€)", color_discrete_sequence=['#2ecc71'])
                         st.plotly_chart(fig1, use_container_width=True)
+            
                         top_items_qty = idf.groupby('item_name').size().nlargest(10).reset_index(name='qty')
                         fig4 = px.bar(top_items_qty, x='qty', y='item_name', orientation='h', title="Top 10 Προϊόντα (Τεμάχια)", color_discrete_sequence=['#e67e22'])
                         st.plotly_chart(fig4, use_container_width=True)
@@ -506,14 +510,13 @@ else:
 
         with tab_settings:
             st.subheader("Διαχείριση Λιστών Επιλογής")
-            # Προσθήκη ελέγχου για να μην είναι άδεια η selectbox αν το συγχρονισμός καθυστερήσει
             current_lists = list(st.session_state.master_lists.keys())
             if not current_lists:
                 current_lists = list(DEFAULT_LISTS.keys())
             
             cat = st.selectbox("Επιλέξτε Λίστα", current_lists)
             
-            # 1. Προσθήκη
+            # 1. Προσθήκη (ΔΙΟΡΘΩΜΕΝΗ ΡΟΗ)
             with st.expander("➕ Προσθήκη Νέου"):
                 new_val = st.text_input("Νέα Τιμή", key="add_new_val")
                 if st.button("Προσθήκη στη Λίστα"):
@@ -521,16 +524,17 @@ else:
                         st.session_state.master_lists[cat].append(new_val)
                         st.session_state.master_lists[cat].sort()
                         if save_master_lists():
-                            st.success(f"Το '{new_val}' προστέθηκε!")
+                            st.success(f"Το '{new_val}' προστέθηκε στη βάση!")
+                            sync_master_lists(force=True) # Force Sync για επιβεβαίωση
                             time.sleep(0.5); st.rerun()
 
-            # 2. Διαχείριση Υπαρχόντων
+            # 2. Διαχείριση Υπαρχόντων (ΔΙΟΡΘΩΜΕΝΗ ΡΟΗ)
             st.write("---")
             st.write(f"Τρέχουσες τιμές στην κατηγορία **{cat}**:")
             for val in sorted(st.session_state.master_lists.get(cat, [])):
                 col1, col2, col3 = st.columns([4, 2, 1])
                 with col1:
-                    st.markdown(f"<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
+                    st.markdown(f<div style='color: #ffffff; padding: 5px; font-weight: bold;'>{val}</div>", unsafe_allow_html=True)
                 with col2:
                     new_name = st.text_input("Μετονομασία", key=f"ren_txt_{val}", placeholder="Νέο όνομα...", label_visibility="collapsed")
                     if st.button("💾", key=f"ren_btn_{val}"):
@@ -539,12 +543,16 @@ else:
                             st.session_state.master_lists[cat][idx] = new_name
                             st.session_state.master_lists[cat].sort()
                             if save_master_lists():
-                                st.success("Μετονομάστηκε!"); time.sleep(0.5); st.rerun()
+                                st.success("Αποθηκεύτηκε στη βάση!"); 
+                                sync_master_lists(force=True) # Force Sync
+                                time.sleep(0.5); st.rerun()
                 with col3:
                     if st.button("🗑️", key=f"del_list_{val}"):
                         st.session_state.master_lists[cat].remove(val)
                         if save_master_lists():
-                            st.warning("Διαγράφηκε!"); time.sleep(0.5); st.rerun()
+                            st.warning("Διαγράφηκε από τη βάση!"); 
+                            sync_master_lists(force=True) # Force Sync
+                            time.sleep(0.5); st.rerun()
 
         with tab_list:
             st.subheader("Τρέχον Απόθεμα")
