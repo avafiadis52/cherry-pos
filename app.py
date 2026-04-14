@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.7.2) ---
-st.set_page_config(page_title="CHERRY v14.7.2", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.7.3) ---
+st.set_page_config(page_title="CHERRY v14.7.3", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -281,7 +281,7 @@ else:
                 st.subheader("📈 Πωλήσεις ανά Ημέρα")
                 daily = fdf.groupby('ΗΜΕΡΟΜΗΝΙΑ')['final_item_price'].sum().reset_index()
                 st.plotly_chart(px.line(daily, x='ΗΜΕΡΟΜΗΝΙΑ', y='final_item_price', markers=True, template="plotly_dark"), use_container_width=True)
-                st.subheader("📋 Αναλυτικό Ημερολόιο")
+                st.subheader("📋 Αναλυτικό Ημερολόγιο")
                 for d_val in sorted(fdf['ΗΜΕΡΟΜΗΝΙΑ'].unique(), reverse=True):
                     day_data = fdf[fdf['ΗΜΕΡΟΜΗΝΙΑ'] == d_val]
                     st.markdown(f"<div class='day-header'>{d_val.strftime('%d/%m/%Y')} | Σύνολο: {day_data['final_item_price'].sum():.2f}€</div>", unsafe_allow_html=True)
@@ -292,26 +292,18 @@ else:
         t_new, t_set, t_inv = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ", "📋 ΑΠΟΘΕΜΑ"])
         
         with t_new:
-            # Βελτιωμένη αναζήτηση τελευταίου σχεδίου
+            # Εύρεση τελευταίου σχεδίου με βάση το id (πραγματικά τελευταία εγγραφή)
             last_design = ""
             try:
-                # Δοκιμάζουμε αναζήτηση με βάση το ID (που αυξάνεται πάντα) αν δεν δουλεύει το created_at
-                res_last = supabase.table("inventory").select("barcode").order("barcode", desc=True).limit(20).execute()
+                res_last = supabase.table("inventory").select("barcode").order("id", desc=True).limit(1).execute()
                 if res_last.data:
-                    # Παίρνουμε το πιο πρόσφατο που έχει το σωστό format
-                    for entry in res_last.data:
-                        parts = entry['barcode'].split('-')
-                        if len(parts) >= 3:
-                            last_design = parts[2]
-                            break
+                    parts = res_last.data[0]['barcode'].split('-')
+                    if len(parts) >= 3: last_design = parts[2]
             except: pass
 
             with st.form("inventory_form", clear_on_submit=True):
-                # Εμφάνιση της τελευταίας τιμής σε έντονο πλαίσιο
                 if last_design:
-                    st.info(f"📌 Τελευταία καταχώρηση σχεδίου: **{last_design}**")
-                else:
-                    st.warning("⚠️ Δεν βρέθηκαν προηγούμενες καταχωρήσεις.")
+                    st.info(f"📌 Τελευταίο Σχέδιο: **{last_design}**")
                 
                 c1, c2, c3 = st.columns(3)
                 f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists.get("Είδη", [])))
@@ -319,8 +311,7 @@ else:
                 f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists.get("Χρώματα", [])))
                 
                 c4, c5, c6 = st.columns(3)
-                # Χρησιμοποιούμε το last_design ως placeholder
-                f_design = c4.text_input("Σχέδιο / Κωδικός", value="", placeholder=str(last_design) if last_design else "π.χ. 001") 
+                f_design = c4.text_input("Σχέδιο / Κωδικός", value="", placeholder=str(last_design) if last_design else "001") 
                 f_size = c5.selectbox("Μέγεθος", sorted(st.session_state.master_lists.get("Μεγέθη", [])))
                 f_comp = c6.selectbox("Σύνθεση", sorted(st.session_state.master_lists.get("Συνθέσεις", [])))
                 
@@ -329,7 +320,7 @@ else:
                 f_stock = c8.number_input("Αρχικό Απόθεμα", min_value=0, value=1)
                 
                 if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ ΠΡΟΪΟΝΤΟΣ"):
-                    if not f_design: st.error("⚠️ Πρέπει να βάλετε Σχέδιο!")
+                    if not f_design: st.error("⚠️ Βάλτε Σχέδιο!")
                     elif f_price <= 0: st.error("⚠️ Βάλτε Τιμή!")
                     else:
                         sku = f"{generate_latin_code(f_item)}-{generate_latin_code(f_prov)}-{f_design.upper().strip()}-{generate_latin_code(f_color)}-{generate_latin_code(f_size)}"
