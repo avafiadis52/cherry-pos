@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.5.7) ---
-st.set_page_config(page_title="CHERRY v14.5.7", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.5.8) ---
+st.set_page_config(page_title="CHERRY v14.5.8", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -78,12 +78,16 @@ def sync_master_lists():
         try:
             res = supabase.table("inventory_settings").select("config_value").eq("config_name", "master_lists").execute()
             if res.data:
-                # Merge logic to ensure new categories like "Μεγέθη" are added to existing data
                 remote_data = res.data[0]['config_value']
-                for key in st.session_state.master_lists:
+                # Διασφάλιση ότι όλα τα default κλειδιά υπάρχουν στα δεδομένα της βάσης
+                updated = False
+                for key, default_val in DEFAULT_LISTS.items():
                     if key not in remote_data:
-                        remote_data[key] = st.session_state.master_lists[key]
+                        remote_data[key] = default_val
+                        updated = True
                 st.session_state.master_lists = remote_data
+                if updated:
+                    save_master_lists()
         except Exception:
             pass
 
@@ -96,7 +100,16 @@ def save_master_lists():
             st.warning("Η αλλαγή έγινε τοπικά, αλλά δεν αποθηκεύτηκε στη βάση.")
             return True
 
-# Session States
+# Default Lists Definition
+DEFAULT_LISTS = {
+    "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
+    "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
+    "Χρώματα": ["Γκρι", "Εκρού", "Εμπριμέ", "Καφέ", "Κίτρινο", "Κόκκινο", "Λευκό", "Μαύρο", "Μπεζ", "Μπλε", "Πουά", "Πράσινο", "Ριγέ", "Σιέλ"],
+    "Μεγέθη": ["One Size", "Small", "Medium", "Large", "XL", "XXL", "36", "38", "40", "42", "44"],
+    "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
+}
+
+# Session States initialization
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'cart' not in st.session_state: st.session_state.cart = []
 if 'selected_cust_id' not in st.session_state: st.session_state.selected_cust_id = None
@@ -107,13 +120,7 @@ if 'mic_key' not in st.session_state: st.session_state.mic_key = 28000
 if 'return_mode' not in st.session_state: st.session_state.return_mode = False
 
 if 'master_lists' not in st.session_state:
-    st.session_state.master_lists = {
-        "Είδη": ["Ζακέτα", "Ζώνη", "Μπλούζα", "Μπουφάν / Παλτό", "Παντελόνι", "Πουκάμισο", "Φόρεμα", "Φούστα"],
-        "Προμηθευτές": ["ONADO", "PINUP", "ΡΕΝΑ", "ΣΤΕΛΛΑ", "ΤΖΕΝΗ"],
-        "Χρώματα": ["Γκρι", "Εκρού", "Εμπριμέ", "Καφέ", "Κίτρινο", "Κόκκινο", "Λευκό", "Μαύρο", "Μπεζ", "Μπλε", "Πουά", "Πράσινο", "Ριγέ", "Σιέλ"],
-        "Μεγέθη": ["One Size", "Small", "Medium", "Large", "XL", "XXL", "36", "38", "40", "42", "44"],
-        "Συνθέσεις": ["100% Βαμβάκι", "100% Πολυέστερ", "70% Βαμβάκι - 30% Πολυέστερ", "98% Βαμβάκι - 2% Ελαστάνη", "100% Δέρμα", "Τεχνητό Δέρμα (PU)"]
-    }
+    st.session_state.master_lists = DEFAULT_LISTS.copy()
     sync_master_lists()
 
 # --- 4. FUNCTIONS ---
@@ -466,14 +473,14 @@ else:
         with tab_new:
             with st.form("inventory_form", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
-                f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists["Είδη"]))
-                f_prov = c2.selectbox("Προμηθευτής", sorted(st.session_state.master_lists["Προμηθευτές"]))
-                f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists["Χρώματα"]))
+                f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists.get("Είδη", [])))
+                f_prov = c2.selectbox("Προμηθευτής", sorted(st.session_state.master_lists.get("Προμηθευτές", [])))
+                f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists.get("Χρώματα", [])))
                 
                 c4, c5, c6 = st.columns(3)
                 f_design = c4.text_input("Σχέδιο / Κωδικός (π.χ. 1022)")
-                f_size = c5.selectbox("Μέγεθος", sorted(st.session_state.master_lists["Μεγέθη"]))
-                f_comp = c6.selectbox("Σύνθεση", sorted(st.session_state.master_lists["Συνθέσεις"]))
+                f_size = c5.selectbox("Μέγεθος", sorted(st.session_state.master_lists.get("Μεγέθη", [])))
+                f_comp = c6.selectbox("Σύνθεση", sorted(st.session_state.master_lists.get("Συνθέσεις", [])))
                 
                 c7, c8 = st.columns(2)
                 f_price = c7.number_input("Τιμή Πώλησης (€)", min_value=0.0, step=1.0)
@@ -481,7 +488,6 @@ else:
                 
                 if st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ ΠΡΟΪΟΝΤΟΣ"):
                     if f_design:
-                        # Barcode structure: ITEM-PROV-DESIGN (no change to remain backward compatible or adjust as needed)
                         sku = "{}-{}-{}".format(generate_latin_code(f_item), generate_latin_code(f_prov), f_design.upper())
                         full_name = "{} {} ({}) [{}]".format(f_item, f_color, f_comp, f_size).upper()
                         try:
