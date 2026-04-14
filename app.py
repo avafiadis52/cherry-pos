@@ -31,8 +31,8 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 3. CONFIG & STYLE (Version v14.6.6) ---
-st.set_page_config(page_title="CHERRY v14.6.6", layout="wide", page_icon="🍒")
+# --- 3. CONFIG & STYLE (Version v14.6.8) ---
+st.set_page_config(page_title="CHERRY v14.6.8", layout="wide", page_icon="🍒")
 
 st.markdown("""
     <style>
@@ -126,7 +126,7 @@ def get_athens_now():
 def generate_latin_code(text):
     char_map = {'Α':'A','Β':'B','Γ':'G','Δ':'D','Ε':'E','Ζ':'Z','Η':'H','Θ':'TH','Ι':'I','Κ':'K','Λ':'L','Μ':'M','Ν':'N','Ξ':'X','Ο':'O','Π':'P','Ρ':'R','Σ':'S','Τ':'T','Υ':'Y','Φ':'F','Χ':'CH','Ψ':'PS','Ω':'O','Ά':'A','Έ':'E','Ή':'H','Ί':'I','Ό':'O','Ύ':'Y','Ώ':'O','Ϊ':'I','Ϋ':'Y'}
     res = "".join([char_map.get(c, c) for c in str(text).upper()])
-    return res[:3]
+    return res if len(res) <= 3 else res[:3]
 
 def reset_app():
     st.session_state.cart, st.session_state.selected_cust_id = [], None
@@ -295,7 +295,7 @@ else:
         t_new, t_set, t_inv = st.tabs(["🆕 ΚΑΤΑΧΩΡΗΣΗ", "⚙️ ΡΥΘΜΙΣΕΙΣ", "📋 ΑΠΟΘΕΜΑ"])
         
         with t_new:
-            # Χρήση st.form για αποτροπή Submit στο Enter
+            # Χρήση st.form με clear_on_submit=True
             with st.form("inventory_form", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
                 f_item = c1.selectbox("Είδος", sorted(st.session_state.master_lists.get("Είδη", [])))
@@ -303,15 +303,14 @@ else:
                 f_color = c3.selectbox("Χρώμα", sorted(st.session_state.master_lists.get("Χρώματα", [])))
                 
                 c4, c5, c6 = st.columns(3)
-                f_design = c4.text_input("Σχέδιο / Κωδικός", key="f_design") 
+                f_design = c4.text_input("Σχέδιο / Κωδικός", value="", key="f_design_inp") 
                 f_size = c5.selectbox("Μέγεθος", sorted(st.session_state.master_lists.get("Μεγέθη", [])))
                 f_comp = c6.selectbox("Σύνθεση", sorted(st.session_state.master_lists.get("Συνθέσεις", [])))
                 
                 c7, c8 = st.columns(2)
-                f_price = c7.number_input("Τιμή Πώλησης (€)", min_value=0.0, step=1.0, key="f_price")
-                f_stock = c8.number_input("Αρχικό Απόθεμα", min_value=0, value=1, key="f_stock")
+                f_price = c7.number_input("Τιμή Πώλησης (€)", min_value=0.0, step=1.0, value=0.0, key="f_price_inp")
+                f_stock = c8.number_input("Αρχικό Απόθεμα", min_value=0, value=1, key="f_stock_inp")
                 
-                # Μόνο αυτό το κουμπί προκαλεί εγγραφή και έλεγχο
                 submitted = st.form_submit_button("💾 ΑΠΟΘΗΚΕΥΣΗ ΠΡΟΪΟΝΤΟΣ")
                 
                 if submitted:
@@ -320,7 +319,13 @@ else:
                     elif f_price <= 0:
                         st.error("⚠️ Η τιμή πώλησης πρέπει να είναι μεγαλύτερη από 0!")
                     else:
-                        sku = "{}-{}-{}".format(generate_latin_code(f_item), generate_latin_code(f_prov), f_design.upper().strip())
+                        sku = "{}-{}-{}-{}-{}".format(
+                            generate_latin_code(f_item), 
+                            generate_latin_code(f_prov), 
+                            f_design.upper().strip(),
+                            generate_latin_code(f_color),
+                            generate_latin_code(f_size)
+                        )
                         full_name = "{} {} ({}) [{}]".format(f_item, f_color, f_comp, f_size).upper()
                         try:
                             supabase.table("inventory").upsert({"barcode": sku, "name": full_name, "price": float(f_price), "stock": int(f_stock)}).execute()
